@@ -1,0 +1,552 @@
+# -*- coding: utf-8 -*-
+"""
+VD Semantic HTML Layout
+Clean, ultra-minimalist, high-performance duo watch platform.
+"""
+
+def GET_HTML():
+    return r"""
+  <div class="app-shell" id="app-shell">
+
+    <!-- ==================================================================== -->
+    <!-- TOP APP HEADER                                                       -->
+    <!-- ==================================================================== -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="app-brand" onclick="goToLobby()" title="VD — На главную">
+          <div class="brand-monogram">VD</div>
+        </div>
+        <div class="header-btn" id="header-room-pill" style="display: none;" title="Текущая комната">
+          <span class="room-status-indicator"></span>
+          <span id="header-room-name">Комната</span>
+        </div>
+      </div>
+
+      <!-- Universal Search (Only shown inside a room) -->
+      <div class="header-center" id="header-center-search" style="display: none;">
+        <div class="universal-search-bar">
+          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="universal-search-input" placeholder="Поиск фильма, сериала, ссылка YouTube или путь..." onkeydown="if(event.key==='Enter') submitUniversalSearch()">
+          <button class="search-submit-btn" onclick="submitUniversalSearch()" title="Запустить видео">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Header Action Controls -->
+      <div class="header-right">
+        <!-- Floating catchup button in header if follower drifts -->
+        <button class="header-btn" id="header-catchup-pill" onclick="jumpToLeaderTime()" style="display: none; color: #f87171; border-color: rgba(239, 68, 68, 0.4); font-weight: 600;" title="Синхронизировать время">
+          ⚡ <span id="header-drift-sec">Синхронизировать</span>
+        </button>
+
+        <button class="header-btn" id="btn-copy-room-link" onclick="copyInviteLink()" style="display: none;" title="Скопировать ссылку для совместного просмотра">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span class="header-btn-label">Пригласить</span>
+        </button>
+
+        <button class="header-btn" id="btn-header-disk" onclick="openDiskModal()" style="display: none;" title="Видео с ПК (0 сек задержка, любой размер)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span class="header-btn-label">Файлы с ПК</span>
+        </button>
+
+        <button class="header-btn" id="btn-toggle-chat" onclick="toggleChatSidebar()" style="display: none;" title="Скрыть/показать чат (Клавиша C)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span class="header-btn-label" id="btn-toggle-chat-label">Чат</span>
+        </button>
+
+        <!-- Live Ping Indicator (Header) -->
+        <button class="header-btn header-ping-pill" id="header-ping-pill" onclick="checkHostPing(false)" title="Задержка сети (нажмите для проверки)">
+          <span class="ping-dot" id="header-ping-dot"></span>
+          <span id="header-ping-text">-- ms</span>
+        </button>
+
+        <!-- Rooms Modal Button (Header) -->
+        <button class="header-btn" id="btn-header-rooms" onclick="openRoomsModal()" title="Список активных комнат (до 24 часов)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+          <span class="header-btn-label">Комнаты</span>
+        </button>
+
+        <!-- Profile / Auth Button (Always visible) -->
+        <div class="user-header-profile" id="user-header-profile" onclick="openAuthOrProfileModal()" title="Мой аккаунт и статистика">
+          <div class="header-avatar" id="header-avatar-circle">U</div>
+          <span class="header-username" id="header-username-text">Войти</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ==================================================================== -->
+    <!-- MAIN WORKSPACE                                                       -->
+    <!-- ==================================================================== -->
+    <main class="app-workspace" id="app-workspace">
+
+      <!-- VIEW 1: LOBBY (VD MINIMALIST HOMEPAGE) -->
+      <section class="view-pane lobby-view active" id="view-lobby">
+        <div class="lobby-hero">
+          <div class="lobby-badge">VD • Совместный просмотр для двоих</div>
+          <h1 class="lobby-hero-title">Смотрите видео вместе на расстоянии</h1>
+          <p class="lobby-hero-sub">Без задержек, без рекламы, с идеальной синхронизацией секунда в секунду.</p>
+          <div class="lobby-hero-actions">
+            <button class="btn-hero-create" onclick="createRoomDirectly()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              <span>Создать комнату</span>
+            </button>
+            <button class="btn-hero-secondary" onclick="openRoomsModal()" title="Список доступных комнат просмотра">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+              </svg>
+              <span>Войти в комнату</span>
+            </button>
+            <button class="btn-hero-ping" id="btn-ping-check" onclick="checkHostPing()" title="Проверить задержку до сервера">
+              <span class="ping-dot" id="ping-indicator-dot"></span>
+              <span id="ping-text">Проверить пинг</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 5 VD Source Cards -->
+        <div class="source-cards-grid">
+          <div class="source-card" onclick="openSearchModalTab('movies')">
+            <div class="source-card-icon" style="color: #38bdf8;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
+                <line x1="7" y1="2" x2="7" y2="22"></line>
+                <line x1="17" y1="2" x2="17" y2="22"></line>
+                <line x1="2" y1="12" x2="22" y2="12"></line>
+              </svg>
+            </div>
+            <div class="source-card-title">Фильмы</div>
+            <div class="source-card-desc">Фильмы и новинки кино с чистым звуком.</div>
+          </div>
+
+          <div class="source-card" onclick="openSearchModalTab('youtube')">
+            <div class="source-card-icon" style="color: #ef4444;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+              </svg>
+            </div>
+            <div class="source-card-title">YouTube</div>
+            <div class="source-card-desc">Любые видео и шоу с YouTube синхронно.</div>
+          </div>
+
+          <div class="source-card" onclick="openDiskModal()">
+            <div class="source-card-icon" style="color: #10b981;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+                <polyline points="13 2 13 9 20 9"></polyline>
+              </svg>
+            </div>
+            <div class="source-card-title">Файлы с ПК</div>
+            <div class="source-card-desc">Мгновенный запуск любого видео с диска за 0 сек.</div>
+          </div>
+
+          <div class="source-card" onclick="openSearchModalTab('series')">
+            <div class="source-card-icon" style="color: #f59e0b;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect>
+                <polyline points="17 2 12 7 7 2"></polyline>
+              </svg>
+            </div>
+            <div class="source-card-title">Сериалы</div>
+            <div class="source-card-desc">Кухня, Холостяк, реалити и любимые сезоны.</div>
+          </div>
+
+          <div class="source-card" onclick="openSearchModalTab('url')">
+            <div class="source-card-icon" style="color: #c084fc;">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+              </svg>
+            </div>
+            <div class="source-card-title">Прямой URL</div>
+            <div class="source-card-desc">Прямой поток HLS .m3u8 или прямой MP4 файл.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 2: WATCH ROOM (THEATER + FULL CONTROLS + COLLAPSIBLE CHAT) -->
+      <section class="view-pane room-layout" id="view-room">
+        
+        <!-- Player Stage Container (Left / Center) -->
+        <div class="player-stage-wrap" id="player-stage-wrap">
+          <div class="player-inner-container" id="player-inner-container">
+
+            <!-- Native HTML5 Video Element (MP4, MKV, HLS, Disk Stream) -->
+            <video id="rave-video-el" playsinline webkit-playsinline preload="auto"></video>
+
+            <!-- YouTube Video Slot (Native IFrame with clean lifecycle, ZERO overlays) -->
+            <div id="yt-player-slot">
+              <div id="yt-player-target"></div>
+            </div>
+
+            <!-- ============================================================ -->
+            <!-- CUSTOM VD CONTROLS OVERLAY (ONLY FOR NATIVE & DISK VIDEOS)   -->
+            <!-- ============================================================ -->
+            <div class="vd-player-overlay" id="vd-player-overlay" style="display: none;">
+              
+              <!-- GESTURE & CLICK LAYER -->
+              <div class="player-gesture-layer" id="player-gesture-layer">
+                <div class="gesture-seek-zone zone-left" id="zone-seek-left" title="Дважды кликните: -10 сек">
+                  <div class="seek-ripple-badge" id="ripple-left">⏪ -10с</div>
+                </div>
+                <div class="gesture-center-zone" id="zone-center-play">
+                  <div class="center-play-flash" id="center-play-flash">
+                    <svg class="flash-icon-play" viewBox="0 0 24 24" fill="currentColor">
+                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    <svg class="flash-icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none;">
+                      <rect x="6" y="4" width="4" height="16"></rect>
+                      <rect x="14" y="4" width="4" height="16"></rect>
+                    </svg>
+                  </div>
+                </div>
+                <div class="gesture-seek-zone zone-right" id="zone-seek-right" title="Дважды кликните: +10 сек">
+                  <div class="seek-ripple-badge" id="ripple-right">+10с ⏩</div>
+                </div>
+              </div>
+
+              <!-- BOTTOM CONTROL BAR (All controls located cleanly at the bottom) -->
+              <div class="player-bottom-bar" id="player-bottom-bar">
+                
+                <!-- Video Title & Sync Badge (Inline above timeline) -->
+                <div class="player-title-row">
+                  <span class="player-title-text" id="player-title-text">Видео</span>
+                </div>
+
+                <!-- Interactive Timeline Scrubber -->
+                <div class="player-timeline-container" id="player-timeline-container">
+                  <div class="timeline-hover-tooltip" id="timeline-hover-tooltip">00:00</div>
+                  <div class="timeline-track">
+                    <div class="timeline-buffer" id="timeline-buffer-bar"></div>
+                    <div class="timeline-progress" id="timeline-progress-bar">
+                      <div class="timeline-thumb"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Controls Buttons Row -->
+                <div class="player-controls-row">
+                  <!-- Left Controls -->
+                  <div class="controls-left">
+                    <button class="player-ctrl-btn" id="btn-ctrl-play" onclick="togglePlayPauseFromUI()" title="Воспроизведение / Пауза (Пробел)">
+                      <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                      </svg>
+                      <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none;">
+                        <rect x="6" y="4" width="4" height="16"></rect>
+                        <rect x="14" y="4" width="4" height="16"></rect>
+                      </svg>
+                    </button>
+
+                    <button class="player-ctrl-btn" onclick="seekRelative(-10)" title="Назад на 10 сек (J / Стрелка влево)">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 4v6h6"></path>
+                        <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                        <text x="12" y="15" font-size="7" font-weight="700" fill="currentColor" text-anchor="middle" stroke="none">10</text>
+                      </svg>
+                    </button>
+
+                    <button class="player-ctrl-btn" onclick="seekRelative(10)" title="Вперед на 10 сек (L / Стрелка вправо)">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M23 4v6h-6"></path>
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                        <text x="12" y="15" font-size="7" font-weight="700" fill="currentColor" text-anchor="middle" stroke="none">10</text>
+                      </svg>
+                    </button>
+
+                    <!-- Volume slider & Mute button -->
+                    <div class="player-volume-group">
+                      <button class="player-ctrl-btn" id="btn-ctrl-volume" onclick="toggleMuteFromUI()" title="Звук (M)">
+                        <svg class="icon-vol-high" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                        </svg>
+                        <svg class="icon-vol-mute" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;">
+                          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                          <line x1="23" y1="9" x2="17" y2="15"></line>
+                          <line x1="17" y1="9" x2="23" y2="15"></line>
+                        </svg>
+                      </button>
+                      <div class="player-volume-slider-wrap">
+                        <input type="range" id="player-volume-slider" min="0" max="1" step="0.02" value="1" oninput="changeVolumeFromUI(this.value)">
+                      </div>
+                    </div>
+
+                    <!-- Time Display -->
+                    <div class="player-time-display" id="player-time-display" onclick="toggleTimeRemainingDisplay()" title="Кликните для переключения оставшегося времени">
+                      <span id="player-current-time">00:00</span>
+                      <span class="time-sep">/</span>
+                      <span id="player-duration-time">00:00</span>
+                    </div>
+                  </div>
+
+                  <!-- Right Controls -->
+                  <div class="controls-right">
+                    <!-- Playback Speed -->
+                    <div class="player-speed-menu-wrap">
+                      <button class="player-ctrl-btn player-speed-btn" id="btn-ctrl-speed" onclick="toggleSpeedMenu()" title="Скорость воспроизведения">
+                        <span id="speed-btn-label">1x</span>
+                      </button>
+                      <div class="speed-dropdown-menu" id="speed-dropdown-menu">
+                        <div class="speed-opt" onclick="setSpeedFromUI(0.5)">0.5x</div>
+                        <div class="speed-opt" onclick="setSpeedFromUI(0.75)">0.75x</div>
+                        <div class="speed-opt active" onclick="setSpeedFromUI(1.0)">1.0x (Обычная)</div>
+                        <div class="speed-opt" onclick="setSpeedFromUI(1.25)">1.25x</div>
+                        <div class="speed-opt" onclick="setSpeedFromUI(1.5)">1.5x</div>
+                        <div class="speed-opt" onclick="setSpeedFromUI(2.0)">2.0x</div>
+                      </div>
+                    </div>
+
+                    <!-- Picture in Picture -->
+                    <button class="player-ctrl-btn" onclick="togglePictureInPicture()" title="Картинка в картинке">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <rect x="12" y="9" width="8" height="6" rx="1" ry="1" fill="currentColor"></rect>
+                      </svg>
+                    </button>
+
+                    <!-- Theater Mode / Chat Toggle -->
+                    <button class="player-ctrl-btn" id="btn-ctrl-theater" onclick="toggleChatSidebar()" title="Театр / Скрыть чат (Клавиша C)">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="2" y="4" width="20" height="16" rx="2"></rect>
+                        <line x1="16" y1="4" x2="16" y2="20"></line>
+                      </svg>
+                    </button>
+
+                    <!-- Fullscreen -->
+                    <button class="player-ctrl-btn" id="btn-ctrl-fullscreen" onclick="toggleStageFullscreen()" title="Полный экран (Клавиша F)">
+                      <svg class="icon-fs-enter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                      </svg>
+                      <svg class="icon-fs-exit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;">
+                        <path d="M4 14h6m0 0v6m0-6L3 21m17-7h-6m0 0v6m0-6l7 7M10 4v6m0 0H4m6 0L3 3m10 7h6m0 0V4m0 6l7-7"></path>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+            <!-- END CUSTOM VD PLAYER CONTROLS OVERLAY -->
+
+            <!-- Empty Room Placeholder (When video is not loaded) -->
+            <div class="empty-player-placeholder" id="empty-player-placeholder">
+              <div class="empty-icon-cloud">
+                <div class="brand-monogram" style="width:48px; height:48px; font-size:1.4rem;">VD</div>
+              </div>
+              <h2 class="empty-title">Выберите видео для совместного просмотра</h2>
+              <p class="empty-sub">Введите название или ссылку в строку поиска сверху, либо выберите источник ниже:</p>
+              <div class="empty-actions-row">
+                <button class="header-btn" onclick="openSearchModalTab('movies')">🎬 Фильмы и Сериалы</button>
+                <button class="header-btn" onclick="openSearchModalTab('youtube')">📺 YouTube</button>
+                <button class="header-btn" onclick="openDiskModal()">📁 Файл с ПК</button>
+                <button class="header-btn" onclick="openSearchModalTab('url')">🔗 Прямая ссылка</button>
+              </div>
+            </div>
+
+            <!-- Drag & Drop Overlay on Player -->
+            <div class="player-drop-overlay" id="player-drop-overlay">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              <div style="font-size: 1.2rem; font-weight: 700;">Отпустите видеофайл сюда</div>
+              <div style="font-size: 0.85rem; opacity: 0.85;">MP4, MKV, WebM — моментальный запуск для всех участников</div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ================================================================ -->
+        <!-- COLLAPSIBLE RIGHT SIDEBAR (CHAT & PARTICIPANTS)                  -->
+        <!-- ================================================================ -->
+        <aside class="room-sidebar" id="room-sidebar">
+          
+          <!-- Sidebar Header -->
+          <div class="sidebar-header">
+            <div class="sidebar-participants-row" id="sidebar-participants-bubbles">
+              <!-- Dynamically populated participant bubbles -->
+            </div>
+            
+            <div class="sidebar-tabs">
+              <button class="sidebar-tab-btn active" id="tab-btn-chat" onclick="switchSidebarTab('chat')">Чат</button>
+              <button class="sidebar-tab-btn" id="tab-btn-members" onclick="switchSidebarTab('members')">Участники</button>
+            </div>
+          </div>
+
+          <!-- TAB 1: CHAT PANE -->
+          <div class="sidebar-content-pane active" id="pane-sidebar-chat">
+            <div class="chat-messages-container" id="chat-messages">
+              <!-- Chat messages stream -->
+            </div>
+
+            <form class="chat-input-bar" id="chat-form" onsubmit="event.preventDefault(); sendChatMessage();">
+              <input type="text" id="chat-input-field" placeholder="Написать сообщение..." autocomplete="off">
+              <button type="submit" class="chat-send-btn" id="btn-send-chat" title="Отправить">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              </button>
+            </form>
+          </div>
+
+          <!-- TAB 2: MEMBERS & SETTINGS PANE -->
+          <div class="sidebar-content-pane" id="pane-sidebar-members">
+            <div class="settings-pane-container">
+              <div class="settings-group">
+                <div class="settings-group-title">В комнате</div>
+                <div id="members-list-items" style="display:flex; flex-direction:column; gap:8px;">
+                  <!-- Dynamic member items -->
+                </div>
+              </div>
+
+              <div class="settings-group">
+                <div class="settings-group-title">Управление комнатой</div>
+                <button class="header-btn" onclick="copyInviteLink()" style="justify-content:center; width:100%;">
+                  📋 Скопировать ссылку для друга
+                </button>
+                <button class="header-btn" onclick="leaveCurrentRoom()" style="justify-content:center; width:100%; color:#ef4444; border-color:rgba(239,68,68,0.3);">
+                  🚪 Выйти из комнаты
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </aside>
+
+      </section>
+
+    </main>
+
+    <!-- ==================================================================== -->
+    <!-- MODALS                                                               -->
+    <!-- ==================================================================== -->
+
+    <!-- 1. SEARCH MODAL -->
+    <div class="modal-overlay" id="modal-search-content">
+      <div class="modal-dialog">
+        <div class="modal-dialog-header">
+          <div class="modal-dialog-title" id="search-modal-title">Поиск видео</div>
+          <button class="modal-dialog-close" onclick="closeModal('modal-search-content')">✕</button>
+        </div>
+        <div class="modal-dialog-body">
+          <div class="universal-search-bar">
+            <input type="text" id="modal-search-input" placeholder="Введите название..." onkeydown="if(event.key==='Enter') executeModalSearch()">
+            <button class="search-submit-btn" onclick="executeModalSearch()">➔</button>
+          </div>
+          <div id="modal-search-results" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:12px; margin-top:10px;">
+            <!-- Results populated dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. LOCAL DISK FILE MODAL -->
+    <div class="modal-overlay" id="modal-disk-file">
+      <div class="modal-dialog">
+        <div class="modal-dialog-header">
+          <div class="modal-dialog-title">Файлы с ПК (0 сек задержка)</div>
+          <button class="modal-dialog-close" onclick="closeModal('modal-disk-file')">✕</button>
+        </div>
+        <div class="modal-dialog-body">
+          <p style="font-size:0.85rem; color:var(--text-secondary);">
+            Укажите прямой путь к видеофайлу на диске или перетащите файл в окно плеера.
+          </p>
+
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="disk-path-input" placeholder="Например: D:\Holos\Холостяк.mp4" style="flex:1; background:var(--bg-card); border:1px solid var(--border-color); border-radius:8px; padding:10px 14px; color:#fff;">
+            <button class="btn-hero-create" style="padding:10px 18px; font-size:0.88rem;" onclick="submitDiskPathFromModal()">Запустить</button>
+          </div>
+
+          <div style="margin-top:16px;">
+            <div style="font-size:0.8rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; margin-bottom:8px;">
+              Недавние файлы на диске
+            </div>
+            <div id="disk-recent-files" style="display:flex; flex-direction:column; gap:6px;">
+              <!-- Dynamic recent files -->
+            </div>
+          </div>
+
+          <div style="margin-top:12px; padding:12px; background:rgba(255,255,255,0.03); border-radius:8px; border:1px dashed var(--border-color); text-align:center;">
+            <input type="file" id="native-file-picker" style="display:none;" accept="video/*" onchange="handleNativeFileSelect(event)">
+            <button class="header-btn" onclick="document.getElementById('native-file-picker').click()">
+              📂 Выбрать видеофайл через проводник
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. USER PROFILE & AUTH MODAL -->
+    <div class="modal-overlay" id="modal-auth-profile">
+      <div class="modal-dialog">
+        <div class="modal-dialog-header">
+          <div class="modal-dialog-title" id="auth-modal-title">Мой аккаунт</div>
+          <button class="modal-dialog-close" onclick="closeModal('modal-auth-profile')">✕</button>
+        </div>
+        <div class="modal-dialog-body" id="auth-modal-body">
+          <!-- Populated dynamically: Profile stats or Login/Register form -->
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. ROOMS LIST MODAL (MAX 24 HOURS LIFETIME) -->
+    <div class="modal-overlay" id="modal-rooms-list">
+      <div class="modal-dialog modal-dialog-rooms">
+        <div class="modal-dialog-header">
+          <div class="modal-dialog-title" style="display:flex; align-items:center; gap:10px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+              <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            </svg>
+            <span>Активные комнаты</span>
+            <span class="badge-rooms-count" id="rooms-modal-badge">0</span>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <button class="btn-refresh-rooms" onclick="refreshRoomsModalList()" title="Обновить список комнат">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <path d="M23 4v6h-6"></path>
+                <path d="M1 20v-6h6"></path>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+            </button>
+            <button class="modal-dialog-close" onclick="closeModal('modal-rooms-list')">✕</button>
+          </div>
+        </div>
+        <div class="modal-dialog-body">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding:8px 12px; background:rgba(255,255,255,0.03); border-radius:8px; border:1px solid var(--border-color); font-size:0.82rem; color:var(--text-secondary);">
+            <span>⏳ Все комнаты хранятся максимум <b>24 часа</b>, после чего автоматически удаляются</span>
+            <button class="header-btn" style="padding:4px 10px; font-size:0.75rem; white-space:nowrap;" onclick="closeModal('modal-rooms-list'); createRoomDirectly();">+ Новая</button>
+          </div>
+          <div id="rooms-list-container" class="rooms-modal-grid">
+            <!-- Populated dynamically via socket/API -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- APP TOAST NOTIFICATION -->
+    <div id="app-toast"></div>
+
+  </div>
+"""
