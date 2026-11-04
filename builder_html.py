@@ -129,7 +129,7 @@ def GET_HTML():
               </div>
               <div class="duo-info">
                 <div class="duo-name-row">
-                  <span class="duo-friend-name" id="duo-friend-name">Денис</span>
+                  <span class="duo-friend-name" id="duo-friend-name">Друг</span>
                   <span class="duo-badge" id="duo-status-badge">В кинозале</span>
                 </div>
                 <div class="duo-video-title" id="duo-video-title">Смотрит видео...</div>
@@ -605,7 +605,7 @@ def GET_HTML():
         </div>
         <div class="modal-dialog-body">
           <div class="friends-add-bar">
-            <input type="text" id="friend-add-username" placeholder="Логин друга (например, Denis или Vika)..." onkeydown="if(event.key==='Enter') submitAddFriend()">
+            <input type="text" id="friend-add-username" placeholder="Логин друга (например, логин пары)..." onkeydown="if(event.key==='Enter') submitAddFriend()">
             <button class="btn-hero-create" style="padding: 9px 16px; font-size: 0.85rem;" onclick="submitAddFriend()">+ Добавить</button>
           </div>
           <div id="friends-list-container" class="friends-list-grid">

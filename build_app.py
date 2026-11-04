@@ -47,6 +47,9 @@ def assemble():
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f0f13">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>VD — Смотрите видео вместе на расстоянии</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%236366f1'/><text x='16' y='22' font-family='sans-serif' font-size='15' font-weight='900' fill='white' text-anchor='middle'>VD</text></svg>">
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>

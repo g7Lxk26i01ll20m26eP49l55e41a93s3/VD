@@ -3,4 +3,4 @@ Flask-SocketIO>=5.3.6
 eventlet>=0.35.2
 requests>=2.31.0
 Pillow>=10.0.0
-gunicorn>=21.2.0
+gunicorn==22.0.0

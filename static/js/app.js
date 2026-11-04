@@ -1701,29 +1701,76 @@ function openAuthOrProfileModal() {
   if (!body) return;
 
   if (currentUser && !currentUser.isGuest) {
-    // Show Profile & Watch Statistics
-    title.textContent = "Мой профиль и статистика";
+    // Show Profile, Avatar Upload & Statistics
+    title.textContent = "Мой профиль и аватарка";
+    const userAv = currentUser.avatar
+      ? `<img src="${escapeHTML(currentUser.avatar)}" style="width:100%; height:100%; object-fit:cover;">`
+      : (currentUser.username ? currentUser.username.charAt(0).toUpperCase() : "U");
+
     body.innerHTML = `
-      <div style="display:flex; align-items:center; gap:14px; padding-bottom:14px; border-bottom:1px solid var(--border-color);">
-        <div class="header-avatar" style="width:48px; height:48px; font-size:1.2rem;">
-          ${currentUser.avatar ? `<img src="${escapeHTML(currentUser.avatar)}">` : (currentUser.username.charAt(0).toUpperCase())}
+      <!-- User Info & Avatar Header -->
+      <div style="display:flex; align-items:center; gap:16px; padding-bottom:14px; border-bottom:1px solid var(--border-color);">
+        <div style="position:relative; cursor:pointer;" onclick="document.getElementById('profile-avatar-file').click()" title="Нажмите, чтобы сменить фото">
+          <div class="header-avatar" id="profile-modal-avatar-preview" style="width:62px; height:62px; font-size:1.5rem; border:2px solid var(--accent); box-shadow:0 0 16px rgba(168,85,247,0.35); overflow:hidden;">
+            ${userAv}
+          </div>
+          <div style="position:absolute; bottom:-3px; right:-3px; background:var(--accent); width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; border:2px solid #0f0f13; box-shadow:0 2px 6px rgba(0,0,0,0.5);">
+            📷
+          </div>
         </div>
-        <div>
-          <div style="font-size:1.1rem; font-weight:700;">${escapeHTML(currentUser.display_name || currentUser.username)}</div>
-          <div style="font-size:0.8rem; color:var(--text-muted);">@${escapeHTML(currentUser.username)}</div>
+        <div style="flex:1; min-width:0;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <input type="text" id="profile-display-name-input" value="${escapeHTML(currentUser.display_name || currentUser.username)}" placeholder="Ваше имя / никнейм" style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:6px; padding:6px 10px; color:#fff; font-size:0.95rem; font-weight:700; width:100%; max-width:180px;">
+            <button class="header-btn" onclick="saveDisplayNameFromUI()" title="Сохранить имя" style="padding:6px 10px; font-size:0.75rem;">💾 Сохранить</button>
+          </div>
+          <div style="font-size:0.78rem; color:var(--text-muted); margin-top:4px;">Логин: @${escapeHTML(currentUser.username)}</div>
         </div>
       </div>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-        <div style="background:var(--bg-card); padding:12px; border-radius:10px; text-align:center;">
-          <div style="font-size:1.3rem; font-weight:800; color:#38bdf8;" id="stat-watch-hours">~</div>
-          <div style="font-size:0.75rem; color:var(--text-muted);">Часов просмотра</div>
+
+      <!-- Avatar Change Controls -->
+      <div style="margin-top:14px; padding:12px; background:rgba(255,255,255,0.03); border-radius:10px; border:1px solid var(--border-color);">
+        <div style="font-size:0.82rem; font-weight:700; color:var(--text-secondary); margin-bottom:8px; display:flex; align-items:center; justify-content:space-between;">
+          <span>Смена аватарки</span>
+          <span style="font-size:0.72rem; color:var(--text-muted);">JPG, PNG, WEBP, GIF</span>
         </div>
-        <div style="background:var(--bg-card); padding:12px; border-radius:10px; text-align:center;">
-          <div style="font-size:1.3rem; font-weight:800; color:#4ade80;" id="stat-movies-count">~</div>
-          <div style="font-size:0.75rem; color:var(--text-muted);">Фильмов и серий</div>
+
+        <!-- Hidden Native File Input -->
+        <input type="file" id="profile-avatar-file" style="display:none;" accept="image/*" onchange="uploadAvatarFile(this)">
+
+        <div style="display:flex; gap:8px;">
+          <button class="btn-hero-create" onclick="document.getElementById('profile-avatar-file').click()" style="flex:1; padding:8px 12px; font-size:0.82rem; justify-content:center;">
+            📁 Загрузить фото с устройства
+          </button>
+        </div>
+
+        <!-- URL Input -->
+        <div style="display:flex; gap:6px; margin-top:10px;">
+          <input type="text" id="avatar-url-input" placeholder="Или ссылка на картинку..." style="flex:1; background:var(--bg-card); border:1px solid var(--border-color); border-radius:8px; padding:7px 10px; font-size:0.8rem; color:#fff;">
+          <button class="header-btn" onclick="saveAvatarFromUrl()" style="padding:7px 12px; font-size:0.8rem; white-space:nowrap;">Сохранить</button>
+        </div>
+
+        <!-- Stylish Preset Avatars -->
+        <div style="margin-top:12px;">
+          <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:6px;">Или выберите пресет в 1 клик:</div>
+          <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:4px;">
+            ${getAvatarPresetsHtml()}
+          </div>
         </div>
       </div>
-      <button class="header-btn" onclick="logoutUser()" style="width:100%; justify-content:center; color:#f87171; margin-top:8px;">
+
+      <!-- Watch Statistics -->
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px;">
+        <div style="background:var(--bg-card); padding:10px; border-radius:10px; text-align:center;">
+          <div style="font-size:1.2rem; font-weight:800; color:#38bdf8;" id="stat-watch-hours">~</div>
+          <div style="font-size:0.72rem; color:var(--text-muted);">Часов просмотра</div>
+        </div>
+        <div style="background:var(--bg-card); padding:10px; border-radius:10px; text-align:center;">
+          <div style="font-size:1.2rem; font-weight:800; color:#4ade80;" id="stat-movies-count">~</div>
+          <div style="font-size:0.72rem; color:var(--text-muted);">Фильмов и серий</div>
+        </div>
+      </div>
+
+      <button class="header-btn" onclick="logoutUser()" style="width:100%; justify-content:center; color:#f87171; margin-top:12px; font-size:0.82rem;">
         Выйти из аккаунта
       </button>
     `;
@@ -1751,6 +1798,127 @@ function openAuthOrProfileModal() {
           <button class="header-btn" onclick="registerUser()" style="flex:1; justify-content:center; padding:10px;">Регистрация</button>
         </div>
       </div>
+    `;
+  }
+}
+
+function getAvatarPresetsHtml() {
+  const presets = [
+    { name: "Neon Cinema", url: "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=160&auto=format&fit=crop&q=80" },
+    { name: "Cyberpunk", url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=160&auto=format&fit=crop&q=80" },
+    { name: "Guy Portrait", url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=160&auto=format&fit=crop&q=80" },
+    { name: "Aesthetic Cat", url: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=160&auto=format&fit=crop&q=80" },
+    { name: "Cosmos", url: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=160&auto=format&fit=crop&q=80" },
+    { name: "Neon Heart", url: "https://images.unsplash.com/photo-1518199266791-5375a83190b7?w=160&auto=format&fit=crop&q=80" },
+    { name: "Popcorn", url: "https://images.unsplash.com/photo-1578849278619-e73505e9610f?w=160&auto=format&fit=crop&q=80" },
+    { name: "Night City", url: "https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=160&auto=format&fit=crop&q=80" }
+  ];
+
+  return presets.map(p => `
+    <button class="preset-avatar-btn" onclick="applyPresetAvatar('${p.url}')" title="${p.name}">
+      <img src="${p.url}" alt="${p.name}">
+    </button>
+  `).join("");
+}
+
+function uploadAvatarFile(input) {
+  if (!input || !input.files || !input.files[0]) return;
+  const file = input.files[0];
+  if (file.size > 15 * 1024 * 1024) {
+    showToast("Файл слишком большой (макс 15 МБ)");
+    return;
+  }
+  showToast("Загрузка и обработка аватарки...");
+  const formData = new FormData();
+  formData.append("avatar", file);
+
+  fetch("/api/auth/avatar", {
+    method: "POST",
+    body: formData
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success && data.avatar) {
+      currentUser.avatar = data.avatar;
+      updateHeaderUserAvatar();
+      updateProfileModalAvatarPreview(data.avatar);
+      showToast("✨ Аватарка успешно обновлена!");
+      if (typeof fetchFriendsActivity === "function") fetchFriendsActivity();
+    } else {
+      showToast(data.error || "Ошибка загрузки аватарки");
+    }
+  })
+  .catch(() => showToast("Ошибка сети при загрузке"));
+}
+
+function saveAvatarFromUrl() {
+  const input = document.getElementById("avatar-url-input");
+  if (!input) return;
+  const url = input.value.trim();
+  if (!url) {
+    showToast("Введите ссылку на картинку");
+    return;
+  }
+  applyPresetAvatar(url);
+  input.value = "";
+}
+
+function applyPresetAvatar(url) {
+  if (!url) return;
+  showToast("Сохранение аватарки...");
+  fetch("/api/auth/avatar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ avatar_url: url })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success && data.avatar) {
+      currentUser.avatar = data.avatar;
+      updateHeaderUserAvatar();
+      updateProfileModalAvatarPreview(data.avatar);
+      showToast("✨ Аватарка успешно обновлена!");
+      if (typeof fetchFriendsActivity === "function") fetchFriendsActivity();
+    } else {
+      showToast(data.error || "Не удалось сохранить аватар");
+    }
+  })
+  .catch(() => showToast("Ошибка сети"));
+}
+
+function updateProfileModalAvatarPreview(avatarUrl) {
+  const el = document.getElementById("profile-modal-avatar-preview");
+  if (el) {
+    el.innerHTML = `<img src="${escapeHTML(avatarUrl)}" style="width:100%; height:100%; object-fit:cover;">`;
+  }
+}
+
+function saveDisplayNameFromUI() {
+  const input = document.getElementById("profile-display-name-input");
+  if (!input) return;
+  const newName = input.value.trim();
+  if (!newName) {
+    showToast("Имя не может быть пустым");
+    return;
+  }
+  fetch("/api/auth/profile", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ display_name: newName })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success && data.user) {
+      currentUser.display_name = data.user.display_name;
+      updateHeaderUserAvatar();
+      showToast(`Имя изменено на «${currentUser.display_name}»!`);
+      if (typeof fetchFriendsActivity === "function") fetchFriendsActivity();
+    } else {
+      showToast(data.error || "Ошибка сохранения имени");
+    }
+  })
+  .catch(() => showToast("Ошибка сети"));
+}
     `;
   }
 }
@@ -2591,7 +2759,7 @@ function renderFriendsModalList(friends) {
     container.innerHTML = `
       <div style="text-align:center; padding:24px 12px; color:var(--text-muted); font-size:0.85rem;">
         У вас пока нет друзей в списке.<br>
-        Введите логин пары (например, <b>Denis</b> или <b>Vika</b>) выше и нажмите «Добавить».
+        Введите логин пользователя выше и нажмите «Добавить».
       </div>
     `;
     return;

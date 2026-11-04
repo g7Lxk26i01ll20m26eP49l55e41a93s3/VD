@@ -677,14 +677,12 @@ def api_auth_avatar():
     avatar_preset = request.form.get("avatar_url") or (request.get_json(silent=True) or {}).get("avatar_url")
     if avatar_preset:
         updated = database.update_user_profile(user["id"], avatar=avatar_preset)
+        socketio.emit("friend_activity_update", {"type": "avatar_updated", "user_id": user["id"]})
         return jsonify({"success": True, "user": updated, "avatar": avatar_preset})
 
-    if "avatar" not in request.files:
-        return jsonify({"error": "Файл не передан"}), 400
-
-    file = request.files["avatar"]
+    file = request.files.get("avatar") or request.files.get("file")
     if not file or not file.filename:
-        return jsonify({"error": "Пустой файл"}), 400
+        return jsonify({"error": "Файл не передан"}), 400
 
     try:
         img = Image.open(file)
@@ -709,6 +707,7 @@ def api_auth_avatar():
 
         avatar_url = f"/static/avatars/{filename}"
         updated = database.update_user_profile(user["id"], avatar=avatar_url)
+        socketio.emit("friend_activity_update", {"type": "avatar_updated", "user_id": user["id"]})
         return jsonify({"success": True, "user": updated, "avatar": avatar_url})
     except Exception as e:
         return jsonify({"error": f"Ошибка обработки изображения: {e}"}), 400

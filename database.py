@@ -445,27 +445,14 @@ def touch_user_activity(user_id: Any):
         pass
 
 def auto_pair_two_users():
-    """Pair duo watch partners automatically."""
+    """Pair the first two registered users automatically for instant duo watch."""
     try:
         with get_connection() as conn:
             cursor = conn.cursor()
-            # 1. Pair first two users (for fresh deployment)
             cursor.execute("SELECT id FROM users ORDER BY id ASC LIMIT 2")
             rows = cursor.fetchall()
             if len(rows) >= 2:
                 add_friendship(rows[0]["id"], rows[1]["id"])
-
-            # 2. Pair Denis & Vika by username if they exist
-            cursor.execute("""
-            SELECT id, LOWER(username) as u, LOWER(display_name) as d FROM users
-            WHERE LOWER(username) IN ('denis', 'денис', 'vika', 'вика')
-               OR LOWER(display_name) IN ('denis', 'денис', 'vika', 'вика')
-            """)
-            duo_rows = cursor.fetchall()
-            denis_ids = [r["id"] for r in duo_rows if 'denis' in r["u"] or 'денис' in r["u"] or 'denis' in r["d"] or 'денис' in r["d"]]
-            vika_ids = [r["id"] for r in duo_rows if 'vika' in r["u"] or 'вика' in r["u"] or 'vika' in r["d"] or 'вика' in r["d"]]
-            if denis_ids and vika_ids:
-                add_friendship(denis_ids[-1], vika_ids[-1])
     except Exception:
         pass
 
