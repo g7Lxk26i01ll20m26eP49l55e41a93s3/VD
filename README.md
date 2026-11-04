@@ -34,8 +34,9 @@ python app.py
 2. Зарегистрируйтесь на [Render.com](https://render.com/) и нажмите **New +** -> **Web Service**.
 3. Подключите репозиторий с GitHub.
 4. Build Command: `pip install -r requirements.txt`
-5. Start Command: `gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT app:app`
-6. Выберите тариф **Free** ($0/mo) и нажмите **Deploy**.
+5. Start Command: `python app.py`
+6. В разделе **Environment Variables** добавьте: `PYTHON_VERSION` = `3.11.9`
+7. Выберите тариф **Free** ($0/mo) и нажмите **Deploy**.
 
 ---
 

@@ -1926,9 +1926,6 @@ function saveDisplayNameFromUI() {
   })
   .catch(() => showToast("Ошибка сети"));
 }
-    `;
-  }
-}
 
 function loginUser() {
   const u = document.getElementById("auth-input-username").value.trim();

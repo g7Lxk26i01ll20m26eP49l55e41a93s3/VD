@@ -29,7 +29,7 @@ def init_db():
             password_hash TEXT NOT NULL,
             avatar TEXT DEFAULT '',
             banner_color TEXT DEFAULT '#8b5cf6',
-            bio TEXT DEFAULT 'Смотрю фильмы и сериалы с друзьями в Rave 🍿',
+            bio TEXT DEFAULT 'Смотрю фильмы и сериалы с друзьями в VD 🍿',
             role TEXT DEFAULT 'user',
             status TEXT DEFAULT 'online',
             created_at REAL NOT NULL,
@@ -342,7 +342,7 @@ def get_user_stats(user_id: int) -> Dict[str, Any]:
         if total_sec >= 3600 * 25:
             achievements.append({"id": "marathoner", "title": "Марафонец", "desc": "25+ часов просмотра в комнатах", "icon": "🏆"})
         if total_sec >= 3600 * 100:
-            achievements.append({"id": "legend", "title": "Легенда Rave", "desc": "100+ часов совместных видео", "icon": "👑"})
+            achievements.append({"id": "legend", "title": "Легенда VD", "desc": "100+ часов совместных видео", "icon": "👑"})
         if stats.get("rooms_created", 0) >= 1:
             achievements.append({"id": "host", "title": "Душа компании", "desc": "Создал собственную комнату", "icon": "👥"})
         if stats.get("movies_count", 0) >= 5:

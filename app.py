@@ -645,8 +645,10 @@ def api_auth_me():
     history = database.get_user_watch_history(user["id"], limit=15)
     return jsonify({"authenticated": True, "user": user, "stats": stats, "history": history})
 
-@app.route("/api/auth/profile", methods=["POST"])
+@app.route("/api/auth/profile", methods=["GET", "POST"])
 def api_auth_profile():
+    if request.method == "GET":
+        return api_auth_me()
     user = get_current_user()
     if not user:
         return jsonify({"error": "Не авторизован"}), 401
@@ -1542,7 +1544,7 @@ def handle_ping_check(data):
 def handle_create_room(data):
     user = data.get("user") or {}
     account_id = clean_text(user.get("id") or data.get("account_id"), 64) or current_session().get("account_id") or new_id("u_")
-    user_name = clean_text(user.get("name") or user.get("username"), 50) or current_user_name() or "Raver"
+    user_name = clean_text(user.get("name") or user.get("username"), 50) or current_user_name() or "Зритель"
     avatar = clean_text(user.get("avatar"), MAX_AVATAR_LEN) or current_session().get("avatar", "")
 
     current_session()["account_id"] = account_id
@@ -1645,7 +1647,7 @@ def handle_leave_room(data=None):
 def handle_join_room(data):
     user = data.get("user") or {}
     account_id = clean_text(user.get("id") or data.get("account_id"), 64) or current_session().get("account_id") or new_id("u_")
-    user_name = clean_text(user.get("name") or user.get("username") or data.get("name"), 50) or current_user_name() or "Raver"
+    user_name = clean_text(user.get("name") or user.get("username") or data.get("name"), 50) or current_user_name() or "Зритель"
     user_avatar = clean_text(user.get("avatar") or data.get("avatar"), MAX_AVATAR_LEN) or current_session().get("avatar", "")
 
     room_id = clean_text(data.get("room_id"), 64)
