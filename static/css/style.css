@@ -1483,3 +1483,375 @@ a {
   transform: translateX(-50%) translateY(0);
   opacity: 1;
 }
+
+/* ========================================================================== */
+/* FRIENDS & DUO WATCH SYSTEM STYLES                                          */
+/* ========================================================================== */
+.friend-online-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 2px;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.friend-online-dot.online {
+  background-color: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+}
+.friend-online-dot.offline {
+  background-color: #64748b;
+  box-shadow: none;
+}
+
+/* DUO LIVE ACTIVITY CARD (LOBBY HERO) */
+.duo-activity-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(168, 85, 247, 0.16) 0%, rgba(99, 102, 241, 0.12) 100%);
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  padding: 14px 20px;
+  margin: 18px auto 0 auto;
+  max-width: 680px;
+  box-shadow: 0 8px 32px rgba(168, 85, 247, 0.18), 0 0 1px rgba(255, 255, 255, 0.2) inset;
+  transition: all 0.25s ease;
+  animation: fadeInScale 0.3s ease;
+}
+.duo-activity-card:hover {
+  border-color: rgba(168, 85, 247, 0.6);
+  box-shadow: 0 12px 36px rgba(168, 85, 247, 0.28);
+}
+@keyframes fadeInScale {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.duo-card-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.duo-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.duo-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+}
+.duo-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.duo-status-pulse {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 12px;
+  height: 12px;
+  background-color: #10b981;
+  border-radius: 50%;
+  border: 2px solid #0f0f13;
+  box-shadow: 0 0 8px #10b981;
+  animation: duoPulse 2s infinite;
+}
+@keyframes duoPulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+  70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+.duo-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  text-align: left;
+}
+.duo-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.duo-friend-name {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #fff;
+  white-space: nowrap;
+}
+.duo-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(168, 85, 247, 0.25);
+  color: #d8b4fe;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.duo-video-title {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.85);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 320px;
+}
+.btn-duo-join {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 18px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 18px rgba(168, 85, 247, 0.4);
+  white-space: nowrap;
+}
+.btn-duo-join:hover {
+  transform: scale(1.03);
+  box-shadow: 0 6px 24px rgba(168, 85, 247, 0.6);
+}
+
+/* LIVE INCOMING DUO INVITATION TOAST */
+.duo-incoming-invite {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  background: rgba(20, 20, 26, 0.96);
+  backdrop-filter: blur(16px);
+  border: 1.5px solid rgba(168, 85, 247, 0.55);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7), 0 0 24px rgba(168, 85, 247, 0.35);
+  border-radius: 16px;
+  padding: 14px 20px;
+  z-index: 1000;
+  max-width: 90vw;
+  width: 520px;
+  animation: slideDownInvite 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes slideDownInvite {
+  from { opacity: 0; transform: translate(-50%, -40px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.invite-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.invite-avatar {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+.invite-texts {
+  min-width: 0;
+  text-align: left;
+}
+.invite-title {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+.invite-video {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #c084fc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.invite-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.invite-btn-accept {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+  white-space: nowrap;
+}
+.invite-btn-accept:hover {
+  transform: scale(1.04);
+}
+.invite-btn-decline {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.invite-btn-decline:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* FRIENDS MODAL & LIST */
+.modal-dialog-friends {
+  max-width: 540px;
+}
+.friends-add-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.friends-add-bar input {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 9px 14px;
+  color: #fff;
+  font-size: 0.88rem;
+}
+.friends-list-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.friend-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px 14px;
+  transition: all 0.2s ease;
+}
+.friend-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+}
+.friend-card-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.friend-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+.friend-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #27272a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #fff;
+  overflow: hidden;
+}
+.friend-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.friend-card-info {
+  min-width: 0;
+  text-align: left;
+}
+.friend-card-name {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: #fff;
+  white-space: nowrap;
+}
+.friend-card-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.friend-card-room-badge {
+  margin-top: 3px;
+  font-size: 0.72rem;
+  color: #c084fc;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.friend-card-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.btn-friend-join {
+  background: linear-gradient(135deg, #a855f7, #6366f1);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  white-space: nowrap;
+}
+.btn-friend-join:hover {
+  transform: scale(1.04);
+}
+.btn-friend-remove {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+}
+.btn-friend-remove:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+.friends-hint-box {
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: rgba(168, 85, 247, 0.08);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 10px;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: rgba(255, 255, 255, 0.75);
+}

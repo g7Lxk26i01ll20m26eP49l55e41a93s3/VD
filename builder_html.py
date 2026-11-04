@@ -73,6 +73,12 @@ def GET_HTML():
           <span id="header-ping-text">-- ms</span>
         </button>
 
+        <!-- Room Friend Quick Invite Button (Only visible in room) -->
+        <button class="header-btn" id="btn-room-invite-friend" onclick="inviteFriendFromRoom()" style="display: none; background: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.4); color: #c084fc; font-weight: 600;" title="Позвать друга в кинозал в 1 клик">
+          <span style="font-size: 13px;">🍿</span>
+          <span class="header-btn-label" id="btn-room-invite-label">Позвать друга</span>
+        </button>
+
         <!-- Rooms Modal Button (Header) -->
         <button class="header-btn" id="btn-header-rooms" onclick="openRoomsModal()" title="Список активных комнат (до 24 часов)">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -80,6 +86,18 @@ def GET_HTML():
             <polyline points="9 22 9 12 15 12 15 22"></polyline>
           </svg>
           <span class="header-btn-label">Комнаты</span>
+        </button>
+
+        <!-- Friends Status & Management Button -->
+        <button class="header-btn" id="btn-header-friends" onclick="openFriendsModal()" title="Друзья и совместный просмотр">
+          <span class="friend-online-dot offline" id="header-friend-dot"></span>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+          <span class="header-btn-label" id="header-friends-label">Друзья</span>
         </button>
 
         <!-- Profile / Auth Button (Always visible) -->
@@ -101,6 +119,31 @@ def GET_HTML():
           <div class="lobby-badge">VD • Совместный просмотр для двоих</div>
           <h1 class="lobby-hero-title">Смотрите видео вместе на расстоянии</h1>
           <p class="lobby-hero-sub">Без задержек, без рекламы, с идеальной синхронизацией секунда в секунду.</p>
+
+          <!-- DUO LIVE ACTIVITY CARD (Instant 1-Click Duo Watch) -->
+          <div class="duo-activity-card" id="duo-friend-banner" style="display: none;">
+            <div class="duo-card-left">
+              <div class="duo-avatar-wrap">
+                <div class="duo-avatar" id="duo-friend-avatar">U</div>
+                <span class="duo-status-pulse" id="duo-friend-pulse"></span>
+              </div>
+              <div class="duo-info">
+                <div class="duo-name-row">
+                  <span class="duo-friend-name" id="duo-friend-name">Денис</span>
+                  <span class="duo-badge" id="duo-status-badge">В кинозале</span>
+                </div>
+                <div class="duo-video-title" id="duo-video-title">Смотрит видео...</div>
+              </div>
+            </div>
+            <div class="duo-card-right">
+              <button class="btn-duo-join" id="duo-join-btn" onclick="joinDuoFriendRoom()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+                <span id="duo-join-btn-text">Войти в кинозал</span>
+              </button>
+            </div>
+          </div>
           <div class="lobby-hero-actions">
             <button class="btn-hero-create" onclick="createRoomDirectly()">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -542,6 +585,51 @@ def GET_HTML():
             <!-- Populated dynamically via socket/API -->
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- 5. FRIENDS & DUO WATCH MODAL -->
+    <div class="modal-overlay" id="modal-friends">
+      <div class="modal-dialog modal-dialog-friends">
+        <div class="modal-dialog-header">
+          <div class="modal-dialog-title" style="display:flex; align-items:center; gap:10px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            <span>Друзья и просмотр для двоих</span>
+          </div>
+          <button class="modal-dialog-close" onclick="closeModal('modal-friends')">✕</button>
+        </div>
+        <div class="modal-dialog-body">
+          <div class="friends-add-bar">
+            <input type="text" id="friend-add-username" placeholder="Логин друга (например, Denis или Vika)..." onkeydown="if(event.key==='Enter') submitAddFriend()">
+            <button class="btn-hero-create" style="padding: 9px 16px; font-size: 0.85rem;" onclick="submitAddFriend()">+ Добавить</button>
+          </div>
+          <div id="friends-list-container" class="friends-list-grid">
+            <!-- Populated dynamically via JS -->
+          </div>
+          <div class="friends-hint-box">
+            💡 <b>Как это работает:</b> Ваши друзья видят, когда вы запустили фильм, и могут войти в кинозал в 1 клик прямо с главной страницы — без пересылки ссылок в Telegram и без паролей. Для всех остальных комната надёжно скрыта.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LIVE INCOMING DUO INVITATION TOAST -->
+    <div class="duo-incoming-invite" id="duo-incoming-invite" style="display: none;">
+      <div class="invite-content">
+        <div class="invite-avatar" id="invite-from-avatar">🍿</div>
+        <div class="invite-texts">
+          <div class="invite-title"><strong id="invite-from-name">Друг</strong> зовёт вас смотреть фильм:</div>
+          <div class="invite-video" id="invite-video-title">Название фильма</div>
+        </div>
+      </div>
+      <div class="invite-actions">
+        <button class="invite-btn-accept" id="btn-accept-invite" onclick="acceptIncomingInvite()">🎬 Смотреть вместе</button>
+        <button class="invite-btn-decline" onclick="dismissIncomingInvite()" title="Закрыть">✕</button>
       </div>
     </div>
 

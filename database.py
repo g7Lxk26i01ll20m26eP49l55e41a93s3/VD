@@ -87,6 +87,22 @@ def init_db():
         """)
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON auth_sessions(user_id);")
 
+        # 5. Friends & Duo Connections Table
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS friends (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            friend_id INTEGER NOT NULL,
+            status TEXT DEFAULT 'accepted',
+            created_at REAL NOT NULL,
+            UNIQUE(user_id, friend_id),
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        """)
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_friends_user ON friends(user_id);")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_friends_friend ON friends(friend_id);")
+
         conn.commit()
 
 # ================================= USER REPOSITORY =================================
@@ -370,5 +386,102 @@ def increment_messages_sent(user_id: int):
         cursor.execute("UPDATE user_stats SET messages_sent = messages_sent + 1 WHERE user_id = ?", (user_id,))
         conn.commit()
 
+
+# ================================= FRIENDS & DUO REPOSITORY =================================
+
+def add_friendship(user_id1: int, user_id2: int):
+    if not user_id1 or not user_id2 or user_id1 == user_id2:
+        return
+    now_ts = time.time()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        INSERT OR IGNORE INTO friends (user_id, friend_id, status, created_at)
+        VALUES (?, ?, 'accepted', ?)
+        """, (user_id1, user_id2, now_ts))
+        cursor.execute("""
+        INSERT OR IGNORE INTO friends (user_id, friend_id, status, created_at)
+        VALUES (?, ?, 'accepted', ?)
+        """, (user_id2, user_id1, now_ts))
+        conn.commit()
+
+def add_friend_by_username(user_id: int, friend_username: str) -> Optional[Dict[str, Any]]:
+    target = get_user_by_username(friend_username.strip())
+    if not target or target["id"] == user_id:
+        return None
+    add_friendship(user_id, target["id"])
+    return target
+
+def remove_friendship(user_id1: int, user_id2: int):
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM friends WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)",
+                       (user_id1, user_id2, user_id2, user_id1))
+        conn.commit()
+
+def are_friends(user_id1: Any, user_id2: Any) -> bool:
+    try:
+        u1 = int(user_id1)
+        u2 = int(user_id2)
+    except (ValueError, TypeError):
+        return False
+    if u1 == u2:
+        return True
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1 FROM friends WHERE user_id = ? AND friend_id = ? AND status = 'accepted'", (u1, u2))
+        return bool(cursor.fetchone())
+
+def touch_user_activity(user_id: Any):
+    """Update last_seen timestamp for active presence tracking."""
+    try:
+        uid = int(user_id)
+        now_ts = time.time()
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE users SET last_seen = ? WHERE id = ?", (now_ts, uid))
+            conn.commit()
+    except Exception:
+        pass
+
+def auto_pair_two_users():
+    """Pair duo watch partners automatically."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            # 1. Pair first two users (for fresh deployment)
+            cursor.execute("SELECT id FROM users ORDER BY id ASC LIMIT 2")
+            rows = cursor.fetchall()
+            if len(rows) >= 2:
+                add_friendship(rows[0]["id"], rows[1]["id"])
+
+            # 2. Pair Denis & Vika by username if they exist
+            cursor.execute("""
+            SELECT id, LOWER(username) as u, LOWER(display_name) as d FROM users
+            WHERE LOWER(username) IN ('denis', 'денис', 'vika', 'вика')
+               OR LOWER(display_name) IN ('denis', 'денис', 'vika', 'вика')
+            """)
+            duo_rows = cursor.fetchall()
+            denis_ids = [r["id"] for r in duo_rows if 'denis' in r["u"] or 'денис' in r["u"] or 'denis' in r["d"] or 'денис' in r["d"]]
+            vika_ids = [r["id"] for r in duo_rows if 'vika' in r["u"] or 'вика' in r["u"] or 'vika' in r["d"] or 'вика' in r["d"]]
+            if denis_ids and vika_ids:
+                add_friendship(denis_ids[-1], vika_ids[-1])
+    except Exception:
+        pass
+
+def get_user_friends(user_id: int) -> List[Dict[str, Any]]:
+    auto_pair_two_users()
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+        SELECT u.id, u.username, u.display_name, u.avatar, u.status, u.last_seen
+        FROM friends f
+        JOIN users u ON f.friend_id = u.id
+        WHERE f.user_id = ? AND f.status = 'accepted'
+        ORDER BY u.last_seen DESC
+        """, (user_id,))
+        return [dict(r) for r in cursor.fetchall()]
+
 # Auto-initialize DB on import
 init_db()
+

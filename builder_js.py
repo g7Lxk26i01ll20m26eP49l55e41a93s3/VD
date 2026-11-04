@@ -92,11 +92,13 @@ document.addEventListener("DOMContentLoaded", function() {
   initYouTubeApi();
   startSyncEngineLoop();
   startContinuousPingLoop();
+  initFriendsSystem();
 
   // Check URL parameters (?room=...&code=...)
   const urlParams = new URLSearchParams(window.location.search);
   const targetRoom = urlParams.get("room");
   const roomCode = urlParams.get("code") || "";
+  if (roomCode) currentRoomCode = roomCode;
 
   if (targetRoom) {
     joinRoomDirectly(targetRoom, roomCode);
@@ -222,7 +224,8 @@ function showLobbyView() {
     "header-catchup-pill",
     "btn-copy-room-link",
     "btn-header-disk",
-    "btn-toggle-chat"
+    "btn-toggle-chat",
+    "btn-room-invite-friend"
   ];
   roomElementsToHide.forEach(id => {
     const el = document.getElementById(id);
@@ -231,6 +234,9 @@ function showLobbyView() {
 
   stopAndTearDownAllPlayers();
   window.history.replaceState({}, "", "/");
+  if (typeof fetchFriendsActivity === "function") {
+    fetchFriendsActivity();
+  }
 }
 
 function showRoomView() {
@@ -244,7 +250,8 @@ function showRoomView() {
     "header-room-pill",
     "btn-copy-room-link",
     "btn-header-disk",
-    "btn-toggle-chat"
+    "btn-toggle-chat",
+    "btn-room-invite-friend"
   ];
   roomElementsToShow.forEach(id => {
     const el = document.getElementById(id);
@@ -261,12 +268,15 @@ function goToLobby() {
 }
 
 // ==========================================================================
-// 5. ROOM MANAGEMENT
+// 5. ROOM MANAGEMENT (PRIVATE 1-ON-1 PROTECTION BY DEFAULT)
 // ==========================================================================
-function createRoomDirectly() {
-  showToast("Создание комнаты совместного просмотра...");
+let currentRoomCode = "";
+
+function createRoomDirectly(isPrivate = true) {
+  showToast(isPrivate ? "🔒 Создание приватной комнаты для двоих..." : "Создание комнаты совместного просмотра...");
   socket.emit("create_room", {
-    name: "Комната " + currentUser.username,
+    name: "Кинозал " + currentUser.username,
+    private: isPrivate,
     user: {
       id: currentUser.id,
       name: currentUser.username,
@@ -280,9 +290,10 @@ function joinRoomDirectly(roomId, code) {
     stopAndTearDownAllPlayers();
   }
   currentRoom = roomId;
+  if (code) currentRoomCode = code;
   socket.emit("join_room", {
     room_id: roomId,
-    code: code || "",
+    code: currentRoomCode || "",
     account_id: currentUser.id,
     user: {
       id: currentUser.id,
@@ -310,14 +321,19 @@ function updateRoomHeaderInfo(roomId) {
   window.currentRoom = roomId;
   currentRoom = roomId;
   const nameEl = document.getElementById("header-room-name");
-  if (nameEl) nameEl.textContent = `Комната ${roomId}`;
-  window.history.replaceState({}, "", `/?room=${encodeURIComponent(roomId)}`);
+  const isPrivate = (currentRoomData && currentRoomData.private) || !!currentRoomCode;
+  if (nameEl) {
+    nameEl.innerHTML = isPrivate ? `🔒 ${currentRoomData ? currentRoomData.name : 'Приватная комната'}` : (currentRoomData ? currentRoomData.name : `Комната ${roomId}`);
+  }
+  const codeParam = currentRoomCode ? `&code=${encodeURIComponent(currentRoomCode)}` : "";
+  window.history.replaceState({}, "", `/?room=${encodeURIComponent(roomId)}${codeParam}`);
 }
 
 function copyInviteLink() {
-  const url = `${window.location.origin}/?room=${encodeURIComponent(currentRoom)}`;
+  const codeParam = currentRoomCode ? `&code=${encodeURIComponent(currentRoomCode)}` : "";
+  const url = `${window.location.origin}/?room=${encodeURIComponent(currentRoom)}${codeParam}`;
   navigator.clipboard.writeText(url).then(() => {
-    showToast("📋 Ссылка скопирована! Отправьте её для совместного просмотра.");
+    showToast(currentRoomCode ? "🔒 Секретная ссылка скопирована! Отправьте её Вике." : "📋 Ссылка скопирована!");
   }).catch(() => {
     showToast("Ссылка: " + url);
   });
@@ -1661,6 +1677,12 @@ function loadAuthSession() {
         currentUser = data.user;
         currentUser.isGuest = false;
         updateHeaderUserAvatar();
+        if (socket && socket.connected) {
+          socket.emit("identify_user", { user_id: currentUser.id });
+        }
+        if (typeof fetchFriendsActivity === "function") {
+          fetchFriendsActivity();
+        }
       }
     })
     .catch(() => {});
@@ -1757,6 +1779,12 @@ function loginUser() {
       updateHeaderUserAvatar();
       closeModal("modal-auth-profile");
       showToast(`Добро пожаловать, ${currentUser.username}!`);
+      if (socket && socket.connected) {
+        socket.emit("identify_user", { user_id: currentUser.id });
+      }
+      if (typeof fetchFriendsActivity === "function") {
+        fetchFriendsActivity();
+      }
     } else {
       showToast(data.message || data.error || "Ошибка входа");
     }
@@ -1781,6 +1809,12 @@ function registerUser() {
       updateHeaderUserAvatar();
       closeModal("modal-auth-profile");
       showToast(`Аккаунт ${currentUser.username} зарегистрирован!`);
+      if (socket && socket.connected) {
+        socket.emit("identify_user", { user_id: currentUser.id });
+      }
+      if (typeof fetchFriendsActivity === "function") {
+        fetchFriendsActivity();
+      }
     } else {
       showToast(data.message || data.error || "Ошибка регистрации");
     }
@@ -1801,6 +1835,9 @@ function logoutUser() {
       updateHeaderUserAvatar();
       closeModal("modal-auth-profile");
       showToast("Вы вышли из аккаунта");
+      if (typeof fetchFriendsActivity === "function") {
+        fetchFriendsActivity();
+      }
     });
 }
 
@@ -1808,6 +1845,9 @@ function logoutUser() {
 // 12. SOCKET.IO EVENT LISTENERS
 // ==========================================================================
 socket.on("connect", function() {
+  if (currentUser && !currentUser.isGuest) {
+    socket.emit("identify_user", { user_id: currentUser.id });
+  }
   if (currentRoom) {
     socket.emit("join_room", {
       room_id: currentRoom,
@@ -1819,14 +1859,16 @@ socket.on("connect", function() {
 
 socket.on("room_created", function(data) {
   if (data && data.room) {
+    if (data.code) currentRoomCode = data.code;
     joinRoomDirectly(data.room.id, data.code || "");
-    showToast(`Комната создана!`);
+    showToast(data.code ? `🔒 Приватная комната создана!` : `Комната создана!`);
   }
 });
 
 socket.on("room_joined", function(data) {
   currentRoomData = data.room;
   currentRoom = data.room.id;
+  if (data.code) currentRoomCode = data.code;
   isCurrentRoomLeader = !!data.is_leader;
   showRoomView();
   updateRoomHeaderInfo(currentRoom);
@@ -1834,6 +1876,22 @@ socket.on("room_joined", function(data) {
     renderPlayer(data.room.video);
   }
   socket.emit("request_sync", { room_id: currentRoom });
+});
+
+socket.on("room_error", function(data) {
+  const msg = (data && data.message) || "Ошибка комнаты";
+  showToast("🔒 " + msg);
+  if (msg.toLowerCase().includes("код") || msg.toLowerCase().includes("секретный")) {
+    const entered = prompt("🔒 Эта комната приватная. Введите секретный код доступа (PIN):");
+    if (entered) {
+      currentRoomCode = entered.trim();
+      joinRoomDirectly(currentRoom, currentRoomCode);
+    } else {
+      showLobbyView();
+    }
+  } else {
+    showLobbyView();
+  }
 });
 
 socket.on("room_state", function(data) {
@@ -2268,5 +2326,365 @@ function formatTimeClock(ts) {
   const d = new Date(ms);
   if (isNaN(d.getTime())) return "";
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+// ==========================================================================
+// 14. FRIENDS & DUO WATCH SYSTEM
+// ==========================================================================
+let lastFriendsData = [];
+let friendsPollInterval = null;
+window.pendingInvite = null;
+
+function initFriendsSystem() {
+  fetchFriendsActivity();
+  if (friendsPollInterval) clearInterval(friendsPollInterval);
+  friendsPollInterval = setInterval(fetchFriendsActivity, 6000);
+
+  socket.on("friend_activity_update", function(data) {
+    fetchFriendsActivity();
+  });
+
+  socket.on("friend_invite_received", function(data) {
+    handleFriendInviteReceived(data);
+  });
+}
+
+function fetchFriendsActivity() {
+  fetch("/api/friends")
+    .then(r => r.json())
+    .then(data => {
+      if (!data || !data.authenticated) {
+        lastFriendsData = [];
+        updateFriendsHeaderIndicator(false, 0);
+        renderDuoFriendBanner(null);
+        return;
+      }
+      const friends = data.friends || [];
+      lastFriendsData = friends;
+
+      const onlineFriends = friends.filter(f => f.is_online);
+      const activeRoomFriend = friends.find(f => f.active_room);
+
+      updateFriendsHeaderIndicator(onlineFriends.length > 0, onlineFriends.length);
+      renderDuoFriendBanner(activeRoomFriend || onlineFriends[0] || null);
+      renderFriendsModalList(friends);
+    })
+    .catch(() => {});
+}
+
+function updateFriendsHeaderIndicator(hasOnline, count) {
+  const dot = document.getElementById("header-friend-dot");
+  const label = document.getElementById("header-friends-label");
+  if (dot) {
+    if (hasOnline) {
+      dot.className = "friend-online-dot online";
+    } else {
+      dot.className = "friend-online-dot offline";
+    }
+  }
+  if (label) {
+    if (hasOnline && lastFriendsData.length > 0) {
+      const activeF = lastFriendsData.find(f => f.is_online);
+      const shortName = activeF ? (activeF.display_name || activeF.username) : "Друзья";
+      label.textContent = shortName;
+    } else {
+      label.textContent = "Друзья";
+    }
+  }
+}
+
+function renderDuoFriendBanner(friend) {
+  const banner = document.getElementById("duo-friend-banner");
+  if (!banner) return;
+
+  // If inside room, don't show lobby banner
+  if (currentRoom) {
+    banner.style.display = "none";
+    return;
+  }
+
+  if (!friend) {
+    banner.style.display = "none";
+    return;
+  }
+
+  const avatarEl = document.getElementById("duo-friend-avatar");
+  const nameEl = document.getElementById("duo-friend-name");
+  const badgeEl = document.getElementById("duo-status-badge");
+  const titleEl = document.getElementById("duo-video-title");
+  const btnTextEl = document.getElementById("duo-join-btn-text");
+  const btn = document.getElementById("duo-join-btn");
+
+  const name = friend.display_name || friend.username || "Друг";
+  if (nameEl) nameEl.textContent = name;
+
+  if (avatarEl) {
+    if (friend.avatar) {
+      avatarEl.innerHTML = `<img src="${escapeHTML(friend.avatar)}" alt="${escapeHTML(name)}">`;
+    } else {
+      avatarEl.textContent = name.charAt(0).toUpperCase();
+    }
+  }
+
+  if (friend.active_room) {
+    const r = friend.active_room;
+    if (badgeEl) {
+      badgeEl.textContent = r.playing ? "🎬 В кинозале (играет)" : "🎬 В кинозале";
+      badgeEl.style.background = "rgba(168, 85, 247, 0.25)";
+      badgeEl.style.color = "#d8b4fe";
+      badgeEl.style.borderColor = "rgba(168, 85, 247, 0.4)";
+    }
+    if (titleEl) {
+      const vidTitle = r.video_title && r.video_title !== "Без названия" ? r.video_title : r.title;
+      titleEl.textContent = `Смотрит: «${vidTitle}»`;
+    }
+    if (btnTextEl) btnTextEl.textContent = `Смотреть вместе с ${name}`;
+    if (btn) {
+      btn.onclick = function() {
+        joinDuoFriendRoom(r.room_id, r.code);
+      };
+    }
+  } else if (friend.is_online) {
+    if (badgeEl) {
+      badgeEl.textContent = "🟢 Онлайн";
+      badgeEl.style.background = "rgba(16, 185, 129, 0.2)";
+      badgeEl.style.color = "#34d399";
+      badgeEl.style.borderColor = "rgba(16, 185, 129, 0.4)";
+    }
+    if (titleEl) {
+      titleEl.textContent = "На сайте — готов к просмотру";
+    }
+    if (btnTextEl) btnTextEl.textContent = `Позвать ${name}`;
+    if (btn) {
+      btn.onclick = function() {
+        createRoomAndInviteFriend(friend.id);
+      };
+    }
+  }
+
+  banner.style.display = "flex";
+}
+
+function joinDuoFriendRoom(roomId, code) {
+  if (!roomId) return;
+  showToast("🎬 Подключение к кинозалу...");
+  joinRoomDirectly(roomId, code || "");
+}
+
+function createRoomAndInviteFriend(friendId) {
+  showToast("🍿 Создание комнаты и отправка приглашения...");
+  const roomName = "Кинозал " + (currentUser.display_name || currentUser.username);
+  socket.emit("create_room", {
+    name: roomName,
+    private: true,
+    user: {
+      id: currentUser.id,
+      name: currentUser.username,
+      avatar: currentUser.avatar
+    }
+  });
+
+  const onCreated = function(data) {
+    socket.off("room_created", onCreated);
+    const rId = data.room ? data.room.id : null;
+    if (rId) {
+      fetch("/api/friends/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ room_id: rId, friend_id: friendId })
+      }).then(() => {
+        showToast("✨ Приглашение успешно отправлено!");
+      });
+    }
+  };
+  socket.on("room_created", onCreated);
+}
+
+function inviteFriendFromRoom() {
+  if (!currentRoom) {
+    showToast("Сначала войдите в комнату");
+    return;
+  }
+  fetch("/api/friends/invite", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ room_id: currentRoom })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      showToast("✨ Приглашение отправлено!");
+    } else {
+      showToast(data.error || "Не удалось отправить приглашение");
+    }
+  })
+  .catch(() => showToast("Ошибка сети"));
+}
+
+function handleFriendInviteReceived(data) {
+  if (!data) return;
+  if (data.target_id && currentUser && !currentUser.isGuest) {
+    if (String(data.target_id) !== String(currentUser.id)) return;
+  }
+  if (currentRoom && String(currentRoom) === String(data.room_id)) {
+    return;
+  }
+
+  window.pendingInvite = data;
+  const toastEl = document.getElementById("duo-incoming-invite");
+  if (!toastEl) return;
+
+  const fromEl = document.getElementById("invite-from-name");
+  const vidEl = document.getElementById("invite-video-title");
+  const avEl = document.getElementById("invite-from-avatar");
+
+  if (fromEl) fromEl.textContent = data.from_name || "Ваш друг";
+  if (vidEl) vidEl.textContent = data.video_title ? `«${data.video_title}»` : "Совместный просмотр";
+  if (avEl) {
+    if (data.from_avatar) {
+      avEl.innerHTML = `<img src="${escapeHTML(data.from_avatar)}" style="width:32px; height:32px; border-radius:50%; object-fit:cover;">`;
+    } else {
+      avEl.textContent = "🍿";
+    }
+  }
+
+  toastEl.style.display = "flex";
+
+  // Subtle web audio chime
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.12, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
+  } catch (e) {}
+
+  clearTimeout(window._inviteTimer);
+  window._inviteTimer = setTimeout(dismissIncomingInvite, 25000);
+}
+
+function acceptIncomingInvite() {
+  if (!window.pendingInvite) return;
+  const inv = window.pendingInvite;
+  dismissIncomingInvite();
+  joinDuoFriendRoom(inv.room_id, inv.code);
+  showToast(`🍿 Смотрим вместе с ${inv.from_name}!`);
+}
+
+function dismissIncomingInvite() {
+  const toastEl = document.getElementById("duo-incoming-invite");
+  if (toastEl) toastEl.style.display = "none";
+  window.pendingInvite = null;
+  clearTimeout(window._inviteTimer);
+}
+
+function openFriendsModal() {
+  openModal("modal-friends");
+  fetchFriendsActivity();
+}
+
+function renderFriendsModalList(friends) {
+  const container = document.getElementById("friends-list-container");
+  if (!container) return;
+
+  if (!friends || friends.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center; padding:24px 12px; color:var(--text-muted); font-size:0.85rem;">
+        У вас пока нет друзей в списке.<br>
+        Введите логин пары (например, <b>Denis</b> или <b>Vika</b>) выше и нажмите «Добавить».
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = friends.map(f => {
+    const name = escapeHTML(f.display_name || f.username);
+    const av = f.avatar
+      ? `<img src="${escapeHTML(f.avatar)}" alt="${name}">`
+      : name.charAt(0).toUpperCase();
+    const statusText = f.is_online ? "🟢 В сети" : "⚪ Не в сети";
+    const roomInfo = f.active_room
+      ? `<div class="friend-card-room-badge">🎬 Смотрит: «${escapeHTML(f.active_room.video_title || f.active_room.title)}»</div>`
+      : "";
+
+    let actionBtn = "";
+    if (f.active_room) {
+      actionBtn = `<button class="btn-friend-join" onclick="closeModal('modal-friends'); joinDuoFriendRoom('${f.active_room.room_id}', '${f.active_room.code}')">🎬 Войти в кинозал</button>`;
+    } else if (f.is_online) {
+      actionBtn = `<button class="btn-friend-join" style="background:linear-gradient(135deg, #10b981, #059669);" onclick="closeModal('modal-friends'); createRoomAndInviteFriend(${f.id})">🍿 Позвать</button>`;
+    }
+
+    return `
+      <div class="friend-card">
+        <div class="friend-card-left">
+          <div class="friend-avatar-wrap">
+            <div class="friend-avatar">${av}</div>
+            <span class="friend-online-dot ${f.is_online ? 'online' : 'offline'}"></span>
+          </div>
+          <div class="friend-card-info">
+            <div class="friend-card-name">${name}</div>
+            <div class="friend-card-meta">@${escapeHTML(f.username)} • ${statusText}</div>
+            ${roomInfo}
+          </div>
+        </div>
+        <div class="friend-card-right">
+          ${actionBtn}
+          <button class="btn-friend-remove" onclick="submitRemoveFriend(${f.id})" title="Удалить из друзей">✕</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function submitAddFriend() {
+  const input = document.getElementById("friend-add-username");
+  if (!input) return;
+  const username = input.value.trim();
+  if (!username) {
+    showToast("Введите логин пользователя");
+    return;
+  }
+  fetch("/api/friends/add", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: username })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      input.value = "";
+      showToast("✅ Пользователь добавлен в друзья!");
+      fetchFriendsActivity();
+    } else {
+      showToast(data.error || "Не удалось добавить друга");
+    }
+  })
+  .catch(() => showToast("Ошибка сети"));
+}
+
+function submitRemoveFriend(friendId) {
+  if (!confirm("Удалить пользователя из друзей?")) return;
+  fetch("/api/friends/remove", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ friend_id: friendId })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      showToast("Пользователь удалён из друзей");
+      fetchFriendsActivity();
+    } else {
+      showToast(data.error || "Ошибка удаления");
+    }
+  })
+  .catch(() => showToast("Ошибка сети"));
 }
 """

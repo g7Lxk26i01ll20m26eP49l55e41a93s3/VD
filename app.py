@@ -763,6 +763,148 @@ def api_user_public(username):
     }
     return jsonify({"user": safe_user, "stats": stats, "history": history})
 
+
+@app.route("/api/friends")
+def api_friends():
+    user = get_current_user()
+    if not user:
+        return jsonify({"friends": [], "authenticated": False})
+
+    friends_list = database.get_user_friends(user["id"])
+    now_ts = time.time()
+    result = []
+    for f in friends_list:
+        fid = f["id"]
+        active_room = None
+        is_online = (now_ts - f.get("last_seen", 0)) < 240
+
+        candidate_rooms = []
+        for r_id, r in state.get("rooms", {}).items():
+            members = room_members(r_id)
+            is_active_member = any(str(m.get("account_id")) == str(fid) or m.get("name") == f.get("display_name") for m in members)
+            is_owner = (str(r.get("owner")) == str(fid)) and ((now_ts - r.get("last_active", 0)) < 300)
+            if is_active_member or is_owner:
+                candidate_rooms.append((1 if is_active_member else 0, r.get("last_active", 0), r_id, r, members))
+
+        if candidate_rooms:
+            candidate_rooms.sort(key=lambda x: (x[0], x[1]), reverse=True)
+            _, _, r_id, r, members = candidate_rooms[0]
+            is_online = True
+            v = r.get("video") or {}
+            active_room = {
+                "room_id": r_id,
+                "title": r.get("title") or r.get("name") or "Комната",
+                "video_title": v.get("title") or "Видео",
+                "video_poster": v.get("poster") or "",
+                "video_url": v.get("url") or "",
+                "playing": bool(v.get("playing", False)),
+                "current_time": v.get("current_time", 0),
+                "members_count": len(members),
+                "code": r.get("code", "")
+            }
+
+        if not is_online:
+            for s in sessions.values():
+                if str(s.get("account_id")) == str(fid):
+                    is_online = True
+                    break
+
+        result.append({
+            "id": fid,
+            "username": f["username"],
+            "display_name": f["display_name"],
+            "avatar": f["avatar"],
+            "is_online": is_online,
+            "active_room": active_room
+        })
+
+    return jsonify({"friends": result, "authenticated": True, "count": len(result)})
+
+@app.route("/api/friends/add", methods=["POST"])
+def api_friends_add():
+    user = get_current_user()
+    if not user:
+        return jsonify({"error": "Требуется авторизация"}), 401
+    data = request.get_json(silent=True) or {}
+    friend_username = clean_text(data.get("username", ""), 40).strip()
+    if not friend_username:
+        return jsonify({"error": "Укажите имя друга"}), 400
+    friend = database.add_friend_by_username(user["id"], friend_username)
+    if not friend:
+        return jsonify({"error": "Пользователь не найден или нельзя добавить самого себя"}), 404
+    socketio.emit("friend_activity_update", {"type": "friend_added"})
+    return jsonify({"success": True, "friend": {
+        "id": friend["id"],
+        "username": friend["username"],
+        "display_name": friend["display_name"],
+        "avatar": friend["avatar"]
+    }})
+
+@app.route("/api/friends/remove", methods=["POST"])
+def api_friends_remove():
+    user = get_current_user()
+    if not user:
+        return jsonify({"error": "Требуется авторизация"}), 401
+    data = request.get_json(silent=True) or {}
+    friend_id = data.get("friend_id")
+    if not friend_id:
+        return jsonify({"error": "Не указан ID друга"}), 400
+    try:
+        fid = int(friend_id)
+        database.remove_friendship(user["id"], fid)
+        socketio.emit("friend_activity_update", {"type": "friend_removed"})
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route("/api/friends/invite", methods=["POST"])
+def api_friends_invite():
+    user = get_current_user()
+    if not user:
+        return jsonify({"error": "Требуется авторизация"}), 401
+    data = request.get_json(silent=True) or {}
+    room_id = clean_text(data.get("room_id"), 64)
+    if not room_id or room_id not in state.get("rooms", {}):
+        return jsonify({"error": "Комната не найдена"}), 404
+
+    room = state["rooms"][room_id]
+    video = room.get("video") or {}
+    v_title = video.get("title") or "Видео"
+
+    target_friend_id = data.get("friend_id")
+    friends = database.get_user_friends(user["id"])
+    invited_count = 0
+
+    invite_payload = {
+        "from_id": user["id"],
+        "from_name": user.get("display_name") or user.get("username"),
+        "from_avatar": user.get("avatar") or "",
+        "room_id": room_id,
+        "room_title": room.get("title") or room.get("name") or "Кинозал",
+        "video_title": v_title,
+        "code": room.get("code", ""),
+        "timestamp": time.time()
+    }
+
+    if target_friend_id:
+        try:
+            tfid = int(target_friend_id)
+            p = {**invite_payload, "target_id": tfid}
+            socketio.emit("friend_invite_received", p, to=f"user_{tfid}")
+            socketio.emit("friend_invite_received", p)
+            invited_count = 1
+        except Exception:
+            pass
+    else:
+        for f in friends:
+            p = {**invite_payload, "target_id": f["id"]}
+            socketio.emit("friend_invite_received", p, to=f"user_{f['id']}")
+            socketio.emit("friend_invite_received", p)
+            invited_count += 1
+
+    return jsonify({"success": True, "invited": invited_count})
+
+
 @app.route("/api/search")
 def api_search():
     q = request.args.get("q", "").strip()
@@ -1281,9 +1423,41 @@ def api_delete_local_video():
 
 # ---------------- SOCKET.IO REALTIME ENGINE ----------------
 
+def bind_user_socket(user):
+    if not user:
+        return
+    session = current_session()
+    uid = str(user["id"])
+    session["account_id"] = uid
+    session["user_name"] = user.get("display_name") or user.get("username")
+    session["avatar"] = user.get("avatar") or ""
+    try:
+        join_room(f"user_{uid}")
+    except Exception:
+        pass
+    database.touch_user_activity(user["id"])
+
 @socketio.on("connect")
 def handle_connect():
+    token = request.cookies.get("rave_token")
+    if token:
+        user = database.get_user_by_session(token)
+        if user:
+            bind_user_socket(user)
     emit_room_list()
+
+@socketio.on("identify_user")
+def handle_identify_user(data=None):
+    token = request.cookies.get("rave_token")
+    user = None
+    if token:
+        user = database.get_user_by_session(token)
+    if not user and data and data.get("user_id"):
+        user = database.get_user_by_id(data["user_id"])
+    if user:
+        bind_user_socket(user)
+        emit("user_identified", {"success": True, "user_id": user["id"]})
+        socketio.emit("friend_activity_update", {"type": "user_online", "user_id": user["id"]})
 
 @socketio.on("disconnect")
 def handle_disconnect():
@@ -1298,6 +1472,7 @@ def handle_disconnect():
                 "online": room_online(room["id"])
             }, to=room_channel(room["id"]))
             emit("rooms_list", visible_rooms(), broadcast=True)
+    socketio.emit("friend_activity_update", {"type": "disconnect"})
 
 @socketio.on("register_account")
 def handle_register_account(data):
@@ -1377,7 +1552,7 @@ def handle_create_room(data):
         current_session()["avatar"] = avatar
 
     name = clean_text(data.get("name") or data.get("title"), 40) or f"Комната {user_name}"
-    private = bool(data.get("private"))
+    private = bool(data.get("private", True)) if "private" in data else True
     code = clean_text(data.get("code"), 64)
     if private and not code:
         code = uuid.uuid4().hex[:6].upper()
@@ -1411,6 +1586,7 @@ def handle_create_room(data):
     emit("room_joined", {"room": public_room(room), "code": code if private else "", "is_leader": True})
     emit_room_state(room, to_sid=request.sid)
     emit("rooms_list", visible_rooms(), broadcast=True)
+    socketio.emit("friend_activity_update", {"room_id": room_id, "type": "created"})
 
 @socketio.on("delete_room")
 def handle_delete_room(data):
@@ -1464,6 +1640,7 @@ def handle_leave_room(data=None):
             }, to=room_channel(room_id))
         emit("room_left", {"room_id": room_id})
         emit("rooms_list", visible_rooms(), broadcast=True)
+        socketio.emit("friend_activity_update", {"type": "leave", "room_id": room_id})
 
 @socketio.on("join_room")
 def handle_join_room(data):
@@ -1497,9 +1674,18 @@ def handle_join_room(data):
             state["room_order"].append(room_id)
         mark_dirty()
 
-    if room.get("private") and room.get("code") != code:
-        emit("room_error", {"message": "Неверный секретный код комнаты"})
-        return
+    if room.get("private"):
+        is_owner = bool(account_id and str(account_id) == str(room.get("owner")))
+        code_matches = bool(code and room.get("code") == code)
+        is_friend = False
+        if account_id and room.get("owner"):
+            try:
+                is_friend = bool(database.are_friends(account_id, room.get("owner")))
+            except Exception:
+                is_friend = False
+        if not (is_owner or code_matches or is_friend):
+            emit("room_error", {"message": "Комната приватная. Доступ разрешён только друзьям или по секретному коду"})
+            return
 
     session = current_session()
     old_room_id = session.get("room_id")
@@ -1529,11 +1715,13 @@ def handle_join_room(data):
         mark_dirty()
 
     room["last_active"] = now()
+    room_code = room.get("code", "") if (room.get("private") and (is_owner or is_friend or code_matches)) else ""
     emit("room_joined", {
         "room": public_room(room),
-        "code": code if room.get("private") else "",
+        "code": room_code,
         "is_leader": (request.sid == room.get("leader_sid"))
     })
+    socketio.emit("friend_activity_update", {"room_id": room_id, "type": "joined"})
     emit_room_state(room, to_sid=request.sid)
     emit("room_members", {
         "room_id": room_id,
@@ -1752,6 +1940,7 @@ def handle_change_video(data):
     }, to=room_channel(room["id"]), include_self=True)
     emit("room_history", room.get("history", [])[-MAX_HISTORY_LINKS:], to=room_channel(room["id"]))
     emit("rooms_list", visible_rooms(), broadcast=True)
+    socketio.emit("friend_activity_update", {"room_id": room["id"], "type": "video_changed"})
 
 @socketio.on("save_moment")
 def handle_save_moment(data):
