@@ -2835,7 +2835,14 @@ function submitAddFriend() {
 }
 
 function submitRemoveFriend(friendId) {
-  if (!confirm("Удалить пользователя из друзей?")) return;
+  // Optimistically remove from UI immediately
+  lastFriendsData = (lastFriendsData || []).filter(f => f.id !== friendId);
+  renderFriendsModalList(lastFriendsData);
+  const onlineFriends = lastFriendsData.filter(f => f.is_online);
+  const activeRoomFriend = lastFriendsData.find(f => f.active_room);
+  updateFriendsHeaderIndicator(onlineFriends.length > 0, onlineFriends.length);
+  renderDuoFriendBanner(activeRoomFriend || onlineFriends[0] || null);
+
   fetch("/api/friends/remove", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -2848,8 +2855,12 @@ function submitRemoveFriend(friendId) {
       fetchFriendsActivity();
     } else {
       showToast(data.error || "Ошибка удаления");
+      fetchFriendsActivity();
     }
   })
-  .catch(() => showToast("Ошибка сети"));
+  .catch(() => {
+    showToast("Ошибка сети");
+    fetchFriendsActivity();
+  });
 }
 """

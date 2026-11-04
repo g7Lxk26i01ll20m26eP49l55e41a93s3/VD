@@ -772,43 +772,47 @@ def api_friends():
         return jsonify({"friends": [], "authenticated": False})
 
     friends_list = database.get_user_friends(user["id"])
-    now_ts = time.time()
+    
+    # Determine strictly live online users from active socket connections
+    connected_uids = set()
+    for s in sessions.values():
+        acc = s.get("account_id")
+        if acc:
+            connected_uids.add(str(acc))
+        db_id = s.get("db_user_id")
+        if db_id:
+            connected_uids.add(str(db_id))
+
     result = []
     for f in friends_list:
         fid = f["id"]
+        is_online = str(fid) in connected_uids
         active_room = None
-        is_online = (now_ts - f.get("last_seen", 0)) < 240
 
-        candidate_rooms = []
-        for r_id, r in state.get("rooms", {}).items():
-            members = room_members(r_id)
-            is_active_member = any(str(m.get("account_id")) == str(fid) or m.get("name") == f.get("display_name") for m in members)
-            is_owner = (str(r.get("owner")) == str(fid)) and ((now_ts - r.get("last_active", 0)) < 300)
-            if is_active_member or is_owner:
-                candidate_rooms.append((1 if is_active_member else 0, r.get("last_active", 0), r_id, r, members))
+        if is_online:
+            candidate_rooms = []
+            for r_id, r in state.get("rooms", {}).items():
+                members = room_members(r_id)
+                is_active_member = any(str(m.get("account_id")) == str(fid) or m.get("name") == f.get("display_name") for m in members)
+                is_owner = (str(r.get("owner")) == str(fid))
+                if is_active_member or is_owner:
+                    candidate_rooms.append((1 if is_active_member else 0, r.get("last_active", 0), r_id, r, members))
 
-        if candidate_rooms:
-            candidate_rooms.sort(key=lambda x: (x[0], x[1]), reverse=True)
-            _, _, r_id, r, members = candidate_rooms[0]
-            is_online = True
-            v = r.get("video") or {}
-            active_room = {
-                "room_id": r_id,
-                "title": r.get("title") or r.get("name") or "Комната",
-                "video_title": v.get("title") or "Видео",
-                "video_poster": v.get("poster") or "",
-                "video_url": v.get("url") or "",
-                "playing": bool(v.get("playing", False)),
-                "current_time": v.get("current_time", 0),
-                "members_count": len(members),
-                "code": r.get("code", "")
-            }
-
-        if not is_online:
-            for s in sessions.values():
-                if str(s.get("account_id")) == str(fid):
-                    is_online = True
-                    break
+            if candidate_rooms:
+                candidate_rooms.sort(key=lambda x: (x[0], x[1]), reverse=True)
+                _, _, r_id, r, members = candidate_rooms[0]
+                v = r.get("video") or {}
+                active_room = {
+                    "room_id": r_id,
+                    "title": r.get("title") or r.get("name") or "Комната",
+                    "video_title": v.get("title") or "Видео",
+                    "video_poster": v.get("poster") or "",
+                    "video_url": v.get("url") or "",
+                    "playing": bool(v.get("playing", False)),
+                    "current_time": v.get("current_time", 0),
+                    "members_count": len(members),
+                    "code": r.get("code", "")
+                }
 
         result.append({
             "id": fid,
@@ -1430,13 +1434,14 @@ def bind_user_socket(user):
     session = current_session()
     uid = str(user["id"])
     session["account_id"] = uid
+    session["db_user_id"] = user["id"]
     session["user_name"] = user.get("display_name") or user.get("username")
     session["avatar"] = user.get("avatar") or ""
     try:
         join_room(f"user_{uid}")
     except Exception:
         pass
-    database.touch_user_activity(user["id"])
+    database.update_user_status(user["id"], "online")
 
 @socketio.on("connect")
 def handle_connect():
@@ -1463,17 +1468,32 @@ def handle_identify_user(data=None):
 @socketio.on("disconnect")
 def handle_disconnect():
     session = sessions.pop(request.sid, None)
-    if session and session.get("room_id"):
-        room = state["rooms"].get(session["room_id"])
-        if room:
-            elect_room_leader(room)
-            emit("room_members", {
-                "room_id": room["id"],
-                "members": room_members(room["id"]),
-                "online": room_online(room["id"])
-            }, to=room_channel(room["id"]))
-            emit("rooms_list", visible_rooms(), broadcast=True)
-    socketio.emit("friend_activity_update", {"type": "disconnect"})
+    if session:
+        uid = session.get("db_user_id") or session.get("account_id")
+        if session.get("room_id"):
+            room = state["rooms"].get(session["room_id"])
+            if room:
+                elect_room_leader(room)
+                emit("room_members", {
+                    "room_id": room["id"],
+                    "members": room_members(room["id"]),
+                    "online": room_online(room["id"])
+                }, to=room_channel(room["id"]))
+                emit("rooms_list", visible_rooms(), broadcast=True)
+        if uid:
+            still_online = any(
+                str(s.get("db_user_id")) == str(uid) or str(s.get("account_id")) == str(uid)
+                for s in sessions.values()
+            )
+            if not still_online:
+                database.update_user_status(uid, "offline")
+                socketio.emit("friend_activity_update", {"type": "user_offline", "user_id": uid})
+            else:
+                socketio.emit("friend_activity_update", {"type": "disconnect"})
+        else:
+            socketio.emit("friend_activity_update", {"type": "disconnect"})
+    else:
+        socketio.emit("friend_activity_update", {"type": "disconnect"})
 
 @socketio.on("register_account")
 def handle_register_account(data):

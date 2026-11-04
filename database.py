@@ -444,20 +444,19 @@ def touch_user_activity(user_id: Any):
     except Exception:
         pass
 
-def auto_pair_two_users():
-    """Pair the first two registered users automatically for instant duo watch."""
+def update_user_status(user_id: Any, status: str):
+    """Update user status ('online' or 'offline') and last_seen timestamp."""
     try:
+        uid = int(user_id)
+        now_ts = time.time()
         with get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id FROM users ORDER BY id ASC LIMIT 2")
-            rows = cursor.fetchall()
-            if len(rows) >= 2:
-                add_friendship(rows[0]["id"], rows[1]["id"])
+            cursor.execute("UPDATE users SET status = ?, last_seen = ? WHERE id = ?", (status, now_ts, uid))
+            conn.commit()
     except Exception:
         pass
 
 def get_user_friends(user_id: int) -> List[Dict[str, Any]]:
-    auto_pair_two_users()
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
