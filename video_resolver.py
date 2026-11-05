@@ -474,6 +474,18 @@ class VideoResolver:
                 "duration": 0
             }
 
+        # Pixeldrain direct stream
+        m_pixel = re.search(r'pixeldrain\.com/(?:u|api/file)/([a-zA-Z0-9_-]+)', url)
+        if m_pixel:
+            fid = m_pixel.group(1)
+            return {
+                "type": "mp4",
+                "url": f"https://pixeldrain.com/api/file/{fid}",
+                "title": "Pixeldrain Video",
+                "poster": "",
+                "duration": 0
+            }
+
         # Direct HLS or MP4 stream links (Checked FIRST before hash resolution!)
         if re.search(r'\.m3u8(\?|$)', url, re.I):
             return {

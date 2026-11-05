@@ -1344,7 +1344,10 @@ function submitUniversalSearch() {
     return;
   }
 
-  // 2. Direct HLS or MP4 stream
+  // 2. Direct HLS or MP4 stream (including Pixeldrain)
+  if (q.includes("pixeldrain.com/u/")) {
+    q = q.replace("pixeldrain.com/u/", "pixeldrain.com/api/file/");
+  }
   if (q.includes(".m3u8") || q.endsWith(".mp4") || q.startsWith("http://") || q.startsWith("https://")) {
     startVideoDirectly({
       url: q,
@@ -1544,8 +1547,25 @@ function executeModalSearch() {
   const input = document.getElementById("modal-search-input");
   const container = document.getElementById("modal-search-results");
   if (!input || !container) return;
-  const q = input.value.trim();
+  let q = input.value.trim();
   if (!q) return;
+
+  if (q.includes("pixeldrain.com/u/")) {
+    q = q.replace("pixeldrain.com/u/", "pixeldrain.com/api/file/");
+  }
+
+  // If a direct URL is pasted into search modal, launch it directly!
+  if (q.startsWith("http://") || q.startsWith("https://")) {
+    closeModal("modal-search-content");
+    startVideoDirectly({
+      url: q,
+      type: q.includes(".m3u8") ? "hls" : "mp4",
+      title: "Прямое видео",
+      duration: 0
+    });
+    input.value = "";
+    return;
+  }
 
   container.innerHTML = `<span style="grid-column: 1/-1; text-align:center; padding:20px; color:var(--text-muted);">Поиск...</span>`;
 
