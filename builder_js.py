@@ -225,6 +225,7 @@ function showLobbyView() {
     "btn-copy-room-link",
     "btn-header-disk",
     "btn-toggle-chat",
+    "btn-toggle-queue",
     "btn-room-invite-friend"
   ];
   roomElementsToHide.forEach(id => {
@@ -251,6 +252,7 @@ function showRoomView() {
     "btn-copy-room-link",
     "btn-header-disk",
     "btn-toggle-chat",
+    "btn-toggle-queue",
     "btn-room-invite-friend"
   ];
   roomElementsToShow.forEach(id => {
@@ -374,6 +376,7 @@ function initCustomPlayerControls() {
       flashPlayPauseIcon(false);
       if (stage) stage.classList.remove("controls-hidden");
     });
+    videoEl.addEventListener("ended", onVideoEnded);
     videoEl.addEventListener("volumechange", updateVolumeUI);
   }
 
@@ -1008,7 +1011,9 @@ function onYouTubeStateChange(event) {
   const curTime = (p && typeof p.getCurrentTime === "function") ? p.getCurrentTime() : 0;
 
   // User clicked Play inside native YouTube player
-  if (state === YT.PlayerState.PLAYING) {
+  if (state === 0 || (typeof YT !== "undefined" && state === YT.PlayerState.ENDED)) {
+    onVideoEnded();
+  } else if (state === YT.PlayerState.PLAYING) {
     currentVideo.playing = true;
     currentVideo.time = curTime;
     currentVideo.updated_at = serverNow();
@@ -1690,7 +1695,11 @@ function appendChatMessage(msg) {
 // 11. AUTH & USER PROFILE MODAL
 // ==========================================================================
 function loadAuthSession() {
-  fetch("/api/auth/me")
+  const token = localStorage.getItem("vd_token");
+  const headers = {};
+  if (token) headers["Authorization"] = "Bearer " + token;
+
+  fetch("/api/auth/me", { headers })
     .then(r => r.json())
     .then(data => {
       if (data && data.user) {
@@ -1959,6 +1968,9 @@ function loginUser() {
   .then(r => r.json())
   .then(data => {
     if (data.success || data.user) {
+      if (data.token) {
+        localStorage.setItem("vd_token", data.token);
+      }
       currentUser = data.user;
       currentUser.isGuest = false;
       updateHeaderUserAvatar();
@@ -1989,6 +2001,9 @@ function registerUser() {
   .then(r => r.json())
   .then(data => {
     if (data.success || data.user) {
+      if (data.token) {
+        localStorage.setItem("vd_token", data.token);
+      }
       currentUser = data.user;
       currentUser.isGuest = false;
       updateHeaderUserAvatar();
@@ -2008,6 +2023,7 @@ function registerUser() {
 }
 
 function logoutUser() {
+  localStorage.removeItem("vd_token");
   fetch("/api/auth/logout", { method: "POST" })
     .finally(() => {
       currentUser = {
@@ -2103,6 +2119,16 @@ socket.on("room_state", function(data) {
   }
   if (data.members) {
     renderRoomMembers(data.members);
+  }
+  if (data.queue) {
+    renderRoomQueue(data.queue);
+  }
+});
+
+socket.on("queue_updated", function(data) {
+  if (data && data.room_id && currentRoom && data.room_id !== currentRoom) return;
+  if (data && data.queue) {
+    renderRoomQueue(data.queue);
   }
 });
 
@@ -2883,4 +2909,130 @@ function submitRemoveFriend(friendId) {
     fetchFriendsActivity();
   });
 }
+
+
+// ==========================================================================
+// 15. VIDEO QUEUE & PLAYLIST LOGIC
+// ==========================================================================
+let currentRoomQueue = [];
+
+function toggleQueueModal() {
+  const modal = document.getElementById("modal-queue");
+  if (modal) {
+    if (modal.classList.contains("active")) {
+      closeModal("modal-queue");
+    } else {
+      openModal("modal-queue");
+      renderRoomQueue(currentRoomQueue);
+    }
+  }
+}
+
+function renderRoomQueue(queue) {
+  currentRoomQueue = Array.isArray(queue) ? queue : [];
+  const badge = document.getElementById("queue-badge");
+  const modalBadge = document.getElementById("queue-modal-badge");
+  const list = document.getElementById("room-queue-list");
+
+  if (badge) {
+    badge.textContent = currentRoomQueue.length;
+    badge.style.display = currentRoomQueue.length > 0 ? "inline-block" : "none";
+  }
+  if (modalBadge) {
+    modalBadge.textContent = currentRoomQueue.length;
+  }
+  if (!list) return;
+
+  if (currentRoomQueue.length === 0) {
+    list.innerHTML = `
+      <div class="queue-empty">
+        <div style="font-size: 2rem; margin-bottom: 8px;">🍿</div>
+        <div style="font-weight: 600; color: #fff;">Очередь воспроизведения пуста</div>
+        <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">Вставьте ссылку выше, чтобы составить плейлист для совместного просмотра</div>
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = currentRoomQueue.map((item, idx) => `
+    <div class="queue-item" data-id="${item.id}" data-index="${idx}">
+      <div class="queue-item-index">${idx + 1}</div>
+      <div class="queue-item-thumb">
+        ${item.poster ? `<img src="${escapeHTML(item.poster)}" alt="">` : `<div class="queue-thumb-fallback">🎬</div>`}
+      </div>
+      <div class="queue-item-details">
+        <div class="queue-item-title" title="${escapeHTML(item.title || 'Видео')}">${escapeHTML(item.title || 'Видео')}</div>
+        <div class="queue-item-meta">
+          <span class="queue-item-source">${escapeHTML((item.type || 'mp4').toUpperCase())}</span>
+          ${item.duration > 0 ? `<span>• ${formatMediaTime(item.duration)}</span>` : ''}
+          ${item.added_by ? `<span>• от @${escapeHTML(item.added_by)}</span>` : ''}
+        </div>
+      </div>
+      <div class="queue-item-actions">
+        ${idx > 0 ? `<button class="queue-btn-action" onclick="moveQueueItem(${idx}, ${idx - 1})" title="Переместить выше">▲</button>` : `<button class="queue-btn-action disabled" disabled>▲</button>`}
+        ${idx < currentRoomQueue.length - 1 ? `<button class="queue-btn-action" onclick="moveQueueItem(${idx}, ${idx + 1})" title="Переместить ниже">▼</button>` : `<button class="queue-btn-action disabled" disabled>▼</button>`}
+        <button class="queue-btn-action queue-btn-play" onclick="playQueueItem('${item.id}')" title="Включить сейчас">▶</button>
+        <button class="queue-btn-action queue-btn-delete" onclick="removeQueueItem('${item.id}')" title="Удалить из очереди">✕</button>
+      </div>
+    </div>
+  `).join("");
+}
+
+function submitAddToQueue() {
+  const input = document.getElementById("queue-add-url");
+  if (!input) return;
+  const url = input.value.trim();
+  if (!url) {
+    showToast("Введите ссылку на видео");
+    return;
+  }
+  if (!currentRoom) {
+    showToast("Сначала войдите в комнату");
+    return;
+  }
+  socket.emit("queue_add", { room_id: currentRoom, url: url });
+  input.value = "";
+  showToast("Видео добавляется в очередь...");
+}
+
+function removeQueueItem(itemId) {
+  if (!currentRoom || !itemId) return;
+  socket.emit("queue_remove", { room_id: currentRoom, item_id: itemId });
+}
+
+function moveQueueItem(fromIdx, toIdx) {
+  if (!currentRoom) return;
+  socket.emit("queue_reorder", { room_id: currentRoom, from_index: fromIdx, to_index: toIdx });
+}
+
+function playQueueItem(itemId) {
+  if (!currentRoom || !itemId) return;
+  socket.emit("queue_play_item", { room_id: currentRoom, item_id: itemId });
+  closeModal("modal-queue");
+}
+
+function submitPlayNextQueue() {
+  if (!currentRoom) return;
+  if (!currentRoomQueue || currentRoomQueue.length === 0) {
+    showToast("Очередь пуста");
+    return;
+  }
+  socket.emit("queue_play_next", { room_id: currentRoom });
+  closeModal("modal-queue");
+}
+
+function submitClearQueue() {
+  if (!currentRoom) return;
+  if (!confirm("Очистить всю очередь видео?")) return;
+  socket.emit("queue_clear", { room_id: currentRoom });
+}
+
+function onVideoEnded() {
+  console.log("[Queue] Video ended event fired. isCurrentRoomLeader:", isCurrentRoomLeader, "queue length:", currentRoomQueue.length);
+  if (isCurrentRoomLeader && currentRoomQueue && currentRoomQueue.length > 0) {
+    showToast("🎬 Следующее видео из очереди...");
+    socket.emit("queue_play_next", { room_id: currentRoom });
+  }
+}
+
 """

@@ -73,6 +73,7 @@ def default_room_extras() -> Dict[str, Any]:
     return {
         "history": [],
         "moments": [],
+        "queue": [],
     }
 
 def make_room(name: str = "Общая", private: bool = False, code: str = "", owner: str = "") -> tuple[str, Dict[str, Any]]:
@@ -417,6 +418,7 @@ def emit_room_state(room: Dict[str, Any], include_self: bool = True, to_sid: Opt
         "chat": room.get("chat", [])[-MAX_HISTORY:],
         "history": room.get("history", [])[-MAX_HISTORY_LINKS:],
         "moments": room.get("moments", [])[-MAX_MOMENTS:],
+        "queue": room.get("queue", []),
         "accounts": state["accounts"],
         "online": room_online(room["id"]),
         "server_time": now(),
@@ -1890,6 +1892,63 @@ def handle_change_audio(data):
         "source_name": current_user_name()
     }, to=room_channel(room["id"]))
 
+def set_room_video(room: Dict[str, Any], raw_url: str, title: str = "", poster: str = "", video_type: Optional[str] = None, duration: float = 0.0, source_sid: str = "", source_name: str = ""):
+    media_data = VideoResolver.resolve(raw_url)
+    video = room["video"]
+    chosen_title = clean_text(title, 120) or media_data.get("title") or "Без названия"
+    v_type = video_type or media_data.get("type")
+    if v_type in ("none", "", None):
+        v_type = "direct"
+    
+    sid = source_sid or (request.sid if request else "")
+    uname = source_name or current_user_name()
+
+    video.update({
+        "url": media_data.get("url") or raw_url,
+        "type": v_type,
+        "id": media_data.get("id") or new_id("v_"),
+        "title": chosen_title,
+        "poster": media_data.get("poster") or clean_text(poster, 500) or "",
+        "duration": float(duration or media_data.get("duration") or 0.0),
+        "playing": True,
+        "time": 0.0,
+        "updated_at": now(),
+        "seq": video.get("seq", 0) + 1,
+        "source_sid": sid,
+        "source_name": uname,
+        "audio_names": media_data.get("audio_names", []),
+        "selected_audio": 0,
+    })
+
+    remember_video(room, video)
+    mark_dirty()
+
+    current_vid = current_video(room)
+    payload = {
+        **current_vid,
+        "video": current_vid,
+        "room_id": room["id"],
+        "action": "play",
+        "server_time": now(),
+        "source_sid": sid,
+        "source_name": uname,
+    }
+    emit("video_changed", payload, to=room_channel(room["id"]), include_self=True)
+    emit("video_state", payload, to=room_channel(room["id"]), include_self=True)
+    emit("video_play", {
+        "room_id": room["id"],
+        "action": "play",
+        "time": 0.0,
+        "playing": True,
+        "server_time": now(),
+        "seq": video["seq"],
+        "source_sid": sid,
+        "source_name": uname,
+    }, to=room_channel(room["id"]), include_self=True)
+    emit("room_history", room.get("history", [])[-MAX_HISTORY_LINKS:], to=room_channel(room["id"]))
+    emit("rooms_list", visible_rooms(), broadcast=True)
+    socketio.emit("friend_activity_update", {"room_id": room["id"], "type": "video_changed"})
+
 @socketio.on("change_video")
 def handle_change_video(data):
     requested_room_id = clean_text(data.get("room_id") or "", 64)
@@ -1913,55 +1972,133 @@ def handle_change_video(data):
             return
 
     raw_url = str(data.get("url") or "").strip()
+    set_room_video(room, raw_url,
+                   title=data.get("title", ""),
+                   poster=data.get("poster", ""),
+                   video_type=data.get("type"),
+                   duration=float(data.get("duration") or 0.0))
+
+# ================================= VIDEO QUEUE EVENTS =================================
+
+@socketio.on("queue_add")
+def handle_queue_add(data):
+    if not isinstance(data, dict):
+        return
+    room_id = clean_text(data.get("room_id") or "", 64)
+    room = state["rooms"].get(room_id) or current_room()
+    if not room:
+        emit("room_error", {"message": "Комната не найдена"})
+        return
+    raw_url = str(data.get("url") or "").strip()
+    if not raw_url:
+        return
     media_data = VideoResolver.resolve(raw_url)
-
-    video = room["video"]
-    chosen_title = clean_text(data.get("title"), 120) or media_data.get("title") or "Без названия"
-    video.update({
+    item = {
+        "id": new_id("q_"),
         "url": media_data.get("url") or raw_url,
+        "raw_url": raw_url,
         "type": media_data.get("type") if media_data.get("type") not in ("none", "", None) else (data.get("type") or "direct"),
-        "id": media_data.get("id") or new_id("v_"),
-        "title": chosen_title,
-        "poster": media_data.get("poster") or clean_text(data.get("poster"), 500),
+        "title": clean_text(data.get("title"), 120) or media_data.get("title") or "Видео из очереди",
+        "poster": media_data.get("poster") or clean_text(data.get("poster"), 500) or "",
         "duration": float(media_data.get("duration") or data.get("duration") or 0.0),
-        "playing": True,
-        "time": 0.0,
-        "updated_at": now(),
-        "seq": video.get("seq", 0) + 1,
-        "source_sid": request.sid,
-        "source_name": current_user_name(),
-        "audio_names": media_data.get("audio_names", []),
-        "selected_audio": 0,
-    })
-
-    remember_video(room, video)
-    mark_dirty()
-
-    current_vid = current_video(room)
-    payload = {
-        **current_vid,
-        "video": current_vid,
-        "room_id": room["id"],
-        "action": "play",
-        "server_time": now(),
-        "source_sid": request.sid,
-        "source_name": current_user_name(),
+        "added_by": current_user_name(),
+        "added_at": now(),
     }
-    emit("video_changed", payload, to=room_channel(room["id"]), include_self=True)
-    emit("video_state", payload, to=room_channel(room["id"]), include_self=True)
-    emit("video_play", {
-        "room_id": room["id"],
-        "action": "play",
-        "time": 0.0,
-        "playing": True,
-        "server_time": now(),
-        "seq": video["seq"],
-        "source_sid": request.sid,
-        "source_name": current_user_name(),
-    }, to=room_channel(room["id"]), include_self=True)
-    emit("room_history", room.get("history", [])[-MAX_HISTORY_LINKS:], to=room_channel(room["id"]))
-    emit("rooms_list", visible_rooms(), broadcast=True)
-    socketio.emit("friend_activity_update", {"room_id": room["id"], "type": "video_changed"})
+    q = room.setdefault("queue", [])
+    q.append(item)
+    mark_dirty()
+    emit("queue_updated", {"room_id": room["id"], "queue": q}, to=room_channel(room["id"]))
+
+@socketio.on("queue_remove")
+def handle_queue_remove(data):
+    if not isinstance(data, dict):
+        return
+    room_id = clean_text(data.get("room_id") or "", 64)
+    room = state["rooms"].get(room_id) or current_room()
+    if not room:
+        return
+    item_id = clean_text(data.get("item_id") or "", 64)
+    q = room.setdefault("queue", [])
+    room["queue"] = [item for item in q if item.get("id") != item_id]
+    mark_dirty()
+    emit("queue_updated", {"room_id": room["id"], "queue": room["queue"]}, to=room_channel(room["id"]))
+
+@socketio.on("queue_reorder")
+def handle_queue_reorder(data):
+    if not isinstance(data, dict):
+        return
+    room_id = clean_text(data.get("room_id") or "", 64)
+    room = state["rooms"].get(room_id) or current_room()
+    if not room:
+        return
+    try:
+        from_idx = int(data.get("from_index"))
+        to_idx = int(data.get("to_index"))
+    except (TypeError, ValueError):
+        return
+    q = room.setdefault("queue", [])
+    if 0 <= from_idx < len(q) and 0 <= to_idx < len(q):
+        item = q.pop(from_idx)
+        q.insert(to_idx, item)
+        mark_dirty()
+        emit("queue_updated", {"room_id": room["id"], "queue": q}, to=room_channel(room["id"]))
+
+@socketio.on("queue_play_next")
+def handle_queue_play_next(data=None):
+    data = data or {}
+    room_id = clean_text(data.get("room_id") or "", 64)
+    room = state["rooms"].get(room_id) or current_room()
+    if not room:
+        return
+    q = room.setdefault("queue", [])
+    if not q:
+        return
+    next_item = q.pop(0)
+    mark_dirty()
+    set_room_video(room, next_item.get("raw_url") or next_item.get("url"),
+                   title=next_item.get("title", ""),
+                   poster=next_item.get("poster", ""),
+                   video_type=next_item.get("type"),
+                   duration=next_item.get("duration", 0.0))
+    emit("queue_updated", {"room_id": room["id"], "queue": q}, to=room_channel(room["id"]))
+
+@socketio.on("queue_play_item")
+def handle_queue_play_item(data):
+    if not isinstance(data, dict):
+        return
+    room_id = clean_text(data.get("room_id") or "", 64)
+    room = state["rooms"].get(room_id) or current_room()
+    if not room:
+        return
+    item_id = clean_text(data.get("item_id") or "", 64)
+    q = room.setdefault("queue", [])
+    target = None
+    new_q = []
+    for it in q:
+        if it.get("id") == item_id and target is None:
+            target = it
+        else:
+            new_q.append(it)
+    if target:
+        room["queue"] = new_q
+        mark_dirty()
+        set_room_video(room, target.get("raw_url") or target.get("url"),
+                       title=target.get("title", ""),
+                       poster=target.get("poster", ""),
+                       video_type=target.get("type"),
+                       duration=target.get("duration", 0.0))
+        emit("queue_updated", {"room_id": room["id"], "queue": new_q}, to=room_channel(room["id"]))
+
+@socketio.on("queue_clear")
+def handle_queue_clear(data=None):
+    data = data or {}
+    room_id = clean_text(data.get("room_id") or "", 64)
+    room = state["rooms"].get(room_id) or current_room()
+    if not room:
+        return
+    room["queue"] = []
+    mark_dirty()
+    emit("queue_updated", {"room_id": room["id"], "queue": []}, to=room_channel(room["id"]))
 
 @socketio.on("save_moment")
 def handle_save_moment(data):

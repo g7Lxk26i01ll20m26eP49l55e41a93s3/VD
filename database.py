@@ -2,11 +2,127 @@ import sqlite3
 import os
 import time
 import uuid
+import json
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from werkzeug.security import generate_password_hash, check_password_hash
 
 DB_PATH = Path(__file__).resolve().parent / "rave.db"
+BACKUP_PATH = Path(__file__).resolve().parent / "users_backup.json"
+
+def backup_database_to_json():
+    """Backs up all users, stats, friends and watch history to users_backup.json."""
+    try:
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, username, display_name, password_hash, avatar, banner_color, bio, role, status, created_at, last_seen FROM users")
+            users = [dict(r) for r in cursor.fetchall()]
+
+            cursor.execute("SELECT * FROM user_stats")
+            stats = [dict(r) for r in cursor.fetchall()]
+
+            cursor.execute("SELECT user_id, friend_id, status, created_at FROM friends")
+            friends = [dict(r) for r in cursor.fetchall()]
+
+            cursor.execute("SELECT user_id, title, poster, url, media_type, duration_sec, watched_sec, updated_at FROM watch_history")
+            history = [dict(r) for r in cursor.fetchall()]
+
+        data = {
+            "version": 2,
+            "updated_at": time.time(),
+            "users": users,
+            "user_stats": stats,
+            "friends": friends,
+            "watch_history": history
+        }
+        temp_path = BACKUP_PATH.with_suffix(".tmp")
+        temp_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        temp_path.replace(BACKUP_PATH)
+    except Exception as e:
+        print(f"[DB] Backup warning: {e}")
+
+def restore_database_from_json():
+    """Restores database from users_backup.json if database is empty."""
+    if not BACKUP_PATH.exists():
+        return
+    try:
+        data = json.loads(BACKUP_PATH.read_text(encoding="utf-8"))
+        users = data.get("users", [])
+        if not users:
+            return
+
+        with get_connection() as conn:
+            cursor = conn.cursor()
+            for u in users:
+                cursor.execute("""
+                INSERT OR IGNORE INTO users (id, username, display_name, password_hash, avatar, banner_color, bio, role, status, created_at, last_seen)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    u.get("id"),
+                    u.get("username"),
+                    u.get("display_name", u.get("username")),
+                    u.get("password_hash"),
+                    u.get("avatar", ""),
+                    u.get("banner_color", "#8b5cf6"),
+                    u.get("bio", "Смотрю фильмы и сериалы с друзьями в VD 🍿"),
+                    u.get("role", "user"),
+                    u.get("status", "offline"),
+                    u.get("created_at", time.time()),
+                    u.get("last_seen", time.time())
+                ))
+
+            for s in data.get("user_stats", []):
+                cursor.execute("""
+                INSERT OR IGNORE INTO user_stats (
+                    user_id, total_watch_seconds, movies_count, rooms_created, messages_sent,
+                    day_mon_sec, day_tue_sec, day_wed_sec, day_thu_sec, day_fri_sec, day_sat_sec, day_sun_sec, last_activity_day
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    s.get("user_id"),
+                    s.get("total_watch_seconds", 0),
+                    s.get("movies_count", 0),
+                    s.get("rooms_created", 0),
+                    s.get("messages_sent", 0),
+                    s.get("day_mon_sec", 0),
+                    s.get("day_tue_sec", 0),
+                    s.get("day_wed_sec", 0),
+                    s.get("day_thu_sec", 0),
+                    s.get("day_fri_sec", 0),
+                    s.get("day_sat_sec", 0),
+                    s.get("day_sun_sec", 0),
+                    s.get("last_activity_day", 0)
+                ))
+
+            for f in data.get("friends", []):
+                cursor.execute("""
+                INSERT OR IGNORE INTO friends (user_id, friend_id, status, created_at)
+                VALUES (?, ?, ?, ?)
+                """, (
+                    f.get("user_id"),
+                    f.get("friend_id"),
+                    f.get("status", "accepted"),
+                    f.get("created_at", time.time())
+                ))
+
+            for h in data.get("watch_history", []):
+                cursor.execute("""
+                INSERT OR IGNORE INTO watch_history (user_id, title, poster, url, media_type, duration_sec, watched_sec, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    h.get("user_id"),
+                    h.get("title"),
+                    h.get("poster", ""),
+                    h.get("url", ""),
+                    h.get("media_type", "movie"),
+                    h.get("duration_sec", 0),
+                    h.get("watched_sec", 0),
+                    h.get("updated_at", time.time())
+                ))
+
+            conn.commit()
+            print(f"[DB] Successfully restored {len(users)} users from backup!")
+    except Exception as e:
+        print(f"[DB] Restore warning: {e}")
 
 def get_connection() -> sqlite3.Connection:
     conn = sqlite3.connect(str(DB_PATH), timeout=15.0)
@@ -104,6 +220,13 @@ def init_db():
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_friends_friend ON friends(friend_id);")
 
         conn.commit()
+        cursor.execute("SELECT count(*) FROM users")
+        row = cursor.fetchone()
+        count = row[0] if row else 0
+        if count == 0:
+            restore_database_from_json()
+        else:
+            backup_database_to_json()
 
 # ================================= USER REPOSITORY =================================
 
@@ -145,6 +268,7 @@ def create_user(username: str, display_name: str, password: str, avatar: str = "
             """, (user_id,))
 
             conn.commit()
+            backup_database_to_json()
             return get_user_by_id(user_id)
         except sqlite3.IntegrityError:
             raise ValueError(f"Пользователь @{username} уже существует")
@@ -206,6 +330,7 @@ def update_user_profile(user_id: int, display_name: Optional[str] = None, bio: O
         cursor = conn.cursor()
         cursor.execute(f"UPDATE users SET {', '.join(fields)} WHERE id = ?", values)
         conn.commit()
+        backup_database_to_json()
 
     return get_user_by_id(user_id)
 
@@ -404,6 +529,7 @@ def add_friendship(user_id1: int, user_id2: int):
         VALUES (?, ?, 'accepted', ?)
         """, (user_id2, user_id1, now_ts))
         conn.commit()
+        backup_database_to_json()
 
 def add_friend_by_username(user_id: int, friend_username: str) -> Optional[Dict[str, Any]]:
     target = get_user_by_username(friend_username.strip())
@@ -418,6 +544,7 @@ def remove_friendship(user_id1: int, user_id2: int):
         cursor.execute("DELETE FROM friends WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)",
                        (user_id1, user_id2, user_id2, user_id1))
         conn.commit()
+        backup_database_to_json()
 
 def are_friends(user_id1: Any, user_id2: Any) -> bool:
     try:

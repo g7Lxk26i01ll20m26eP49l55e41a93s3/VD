@@ -67,6 +67,19 @@ def GET_HTML():
           <span class="header-btn-label" id="btn-toggle-chat-label">Чат</span>
         </button>
 
+        <button class="header-btn" id="btn-toggle-queue" onclick="toggleQueueModal()" style="display: none;" title="Очередь воспроизведения (плейлист)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+          <span class="header-btn-label">Очередь</span>
+          <span class="badge" id="queue-badge" style="display: none; margin-left: 4px; padding: 1px 6px; font-size: 11px; background: #8b5cf6; border-radius: 10px; color: #fff; font-weight: 700;">0</span>
+        </button>
+
         <!-- Live Ping Indicator (Header) -->
         <button class="header-btn header-ping-pill" id="header-ping-pill" onclick="checkHostPing(false)" title="Задержка сети (нажмите для проверки)">
           <span class="ping-dot" id="header-ping-dot"></span>
@@ -613,6 +626,43 @@ def GET_HTML():
           </div>
           <div class="friends-hint-box">
             💡 <b>Как это работает:</b> Ваши друзья видят, когда вы запустили фильм, и могут войти в кинозал в 1 клик прямо с главной страницы — без пересылки ссылок в Telegram и без паролей. Для всех остальных комната надёжно скрыта.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. VIDEO PLAYLIST & QUEUE MODAL -->
+    <div class="modal-overlay" id="modal-queue">
+      <div class="modal-dialog modal-dialog-queue">
+        <div class="modal-dialog-header">
+          <div class="modal-dialog-title" style="display:flex; align-items:center; gap:10px;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="8" y1="6" x2="21" y2="6"></line>
+              <line x1="8" y1="12" x2="21" y2="12"></line>
+              <line x1="8" y1="18" x2="21" y2="18"></line>
+              <line x1="3" y1="6" x2="3.01" y2="6"></line>
+              <line x1="3" y1="12" x2="3.01" y2="12"></line>
+              <line x1="3" y1="18" x2="3.01" y2="18"></line>
+            </svg>
+            <span>Очередь воспроизведения</span>
+            <span class="badge-rooms-count" id="queue-modal-badge">0</span>
+          </div>
+          <button class="modal-dialog-close" onclick="closeModal('modal-queue')">✕</button>
+        </div>
+        <div class="modal-dialog-body">
+          <div class="queue-add-box">
+            <input type="text" id="queue-add-url" placeholder="Ссылка на видео (YouTube, Pixeldrain, MP4, HLS m3u8)..." onkeydown="if(event.key==='Enter') submitAddToQueue()">
+            <button class="btn-hero-create" style="padding: 9px 18px; font-size: 0.85rem; white-space: nowrap;" onclick="submitAddToQueue()">+ В очередь</button>
+          </div>
+          <div class="queue-actions-bar">
+            <span class="queue-status-hint">⚡ Видео переключаются автоматически по завершении</span>
+            <div style="display:flex; gap:8px;">
+              <button class="queue-action-pill" onclick="submitPlayNextQueue()" title="Немедленно включить следующее видео">▶ Следующее сейчас</button>
+              <button class="queue-action-pill danger" onclick="submitClearQueue()" title="Очистить всю очередь">Очистить</button>
+            </div>
+          </div>
+          <div id="room-queue-list" class="queue-list-container">
+            <!-- Populated dynamically via JS -->
           </div>
         </div>
       </div>

@@ -1887,4 +1887,187 @@ a {
   line-height: 1.45;
   color: rgba(255, 255, 255, 0.75);
 }
+
+/* ========================================================================== */
+/* VIDEO QUEUE & PLAYLIST STYLES                                              */
+/* ========================================================================== */
+.modal-dialog-queue {
+  max-width: 620px;
+  width: 95%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+.queue-add-box {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.queue-add-box input {
+  flex: 1;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  color: var(--text-primary);
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+.queue-add-box input:focus {
+  border-color: var(--accent);
+}
+.queue-actions-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin-bottom: 14px;
+  font-size: 0.8rem;
+}
+.queue-status-hint {
+  color: var(--text-secondary);
+}
+.queue-action-pill {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.queue-action-pill:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+.queue-action-pill.danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+.queue-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  max-height: 480px;
+  padding-right: 4px;
+}
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.queue-item:hover {
+  border-color: var(--border-hover);
+}
+.queue-item-index {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent);
+  width: 22px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.queue-item-thumb {
+  width: 60px;
+  height: 38px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.queue-item-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.queue-thumb-fallback {
+  font-size: 1.1rem;
+}
+.queue-item-details {
+  flex: 1;
+  min-width: 0;
+}
+.queue-item-title {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.queue-item-meta {
+  display: flex;
+  gap: 6px;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+.queue-item-source {
+  background: rgba(56, 189, 248, 0.15);
+  color: var(--accent);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 0.68rem;
+}
+.queue-item-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.queue-btn-action {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: all 0.12s ease;
+}
+.queue-btn-action:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+.queue-btn-action.disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.queue-btn-play:hover {
+  background: rgba(56, 189, 248, 0.2);
+  color: var(--accent);
+  border-color: rgba(56, 189, 248, 0.4);
+}
+.queue-btn-delete:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+.queue-empty {
+  text-align: center;
+  padding: 36px 16px;
+  border: 1px dashed var(--border-color);
+  border-radius: 12px;
+  margin: 10px 0;
+}
 """
