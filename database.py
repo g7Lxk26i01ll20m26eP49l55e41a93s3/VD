@@ -2,6 +2,8 @@ import sqlite3
 import os
 import time
 import uuid
+import hmac
+import hashlib
 import json
 from pathlib import Path
 from typing import Dict, Any, Optional, List
@@ -9,6 +11,30 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 DB_PATH = Path(__file__).resolve().parent / "rave.db"
 BACKUP_PATH = Path(__file__).resolve().parent / "users_backup.json"
+
+SESSION_SECRET = os.environ.get("VD_SESSION_SECRET", "vd_session_secret_key_salt_2026_xyz_permanent")
+
+def generate_signed_token(user_id: int, expires_ts: float) -> str:
+    payload = f"{user_id}:{int(expires_ts)}"
+    sig = hmac.new(SESSION_SECRET.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{user_id}.{int(expires_ts)}.{sig}"
+
+def verify_signed_token(token: str):
+    try:
+        parts = token.strip().split(".")
+        if len(parts) != 3:
+            return None
+        user_id_str, exp_str, sig = parts
+        payload = f"{user_id_str}:{exp_str}"
+        expected = hmac.new(SESSION_SECRET.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(sig, expected):
+            return None
+        if float(exp_str) < time.time():
+            return None
+        return int(user_id_str)
+    except Exception:
+        return None
+
 
 def backup_database_to_json():
     """Backs up all users, stats, friends and watch history to users_backup.json."""
@@ -27,13 +53,17 @@ def backup_database_to_json():
             cursor.execute("SELECT user_id, title, poster, url, media_type, duration_sec, watched_sec, updated_at FROM watch_history")
             history = [dict(r) for r in cursor.fetchall()]
 
+        cursor.execute("SELECT token, user_id, created_at, expires_at FROM auth_sessions WHERE expires_at > ?", (time.time(),))
+        active_sessions = [dict(r) for r in cursor.fetchall()]
+
         data = {
-            "version": 2,
+            "version": 3,
             "updated_at": time.time(),
             "users": users,
             "user_stats": stats,
             "friends": friends,
-            "watch_history": history
+            "watch_history": history,
+            "auth_sessions": active_sessions
         }
         temp_path = BACKUP_PATH.with_suffix(".tmp")
         temp_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -119,8 +149,19 @@ def restore_database_from_json():
                     h.get("updated_at", time.time())
                 ))
 
+            for s in data.get("auth_sessions", []):
+                cursor.execute("""
+                INSERT OR IGNORE INTO auth_sessions (token, user_id, created_at, expires_at)
+                VALUES (?, ?, ?, ?)
+                """, (
+                    s.get("token"),
+                    s.get("user_id"),
+                    s.get("created_at", time.time()),
+                    s.get("expires_at", time.time() + 30 * 86400)
+                ))
+
             conn.commit()
-            print(f"[DB] Successfully restored {len(users)} users from backup!")
+            print(f"[DB] Successfully restored {len(users)} users and {len(data.get('auth_sessions', []))} sessions from backup!")
     except Exception as e:
         print(f"[DB] Restore warning: {e}")
 
@@ -222,11 +263,8 @@ def init_db():
         conn.commit()
         cursor.execute("SELECT count(*) FROM users")
         row = cursor.fetchone()
-        count = row[0] if row else 0
-        if count == 0:
-            restore_database_from_json()
-        else:
-            backup_database_to_json()
+        restore_database_from_json()
+        backup_database_to_json()
 
 # ================================= USER REPOSITORY =================================
 
@@ -337,24 +375,36 @@ def update_user_profile(user_id: int, display_name: Optional[str] = None, bio: O
 # ================================= SESSIONS =================================
 
 def create_session(user_id: int, duration_days: int = 30) -> str:
-    token = uuid.uuid4().hex + uuid.uuid4().hex
     now_ts = time.time()
     expires_ts = now_ts + (duration_days * 86400)
+    token = generate_signed_token(user_id, expires_ts)
 
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-        INSERT INTO auth_sessions (token, user_id, created_at, expires_at)
+        INSERT OR REPLACE INTO auth_sessions (token, user_id, created_at, expires_at)
         VALUES (?, ?, ?, ?)
         """, (token, user_id, now_ts, expires_ts))
         conn.commit()
 
+    backup_database_to_json()
     return token
 
 def get_user_by_session(token: str) -> Optional[Dict[str, Any]]:
     if not token or not isinstance(token, str):
         return None
+    token = token.strip()
     now_ts = time.time()
+
+    # 1. Stateless HMAC validation (indestructible across database wipes & redeploys)
+    signed_uid = verify_signed_token(token)
+    if signed_uid:
+        user = get_user_by_id(signed_uid)
+        if user:
+            touch_user_activity(signed_uid)
+            return user
+
+    # 2. Database table lookup (backward compatibility for legacy UUID tokens)
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
@@ -362,7 +412,7 @@ def get_user_by_session(token: str) -> Optional[Dict[str, Any]]:
         FROM auth_sessions s
         JOIN users u ON s.user_id = u.id
         WHERE s.token = ? AND s.expires_at > ?
-        """, (token.strip(), now_ts))
+        """, (token, now_ts))
         row = cursor.fetchone()
         if not row:
             return None

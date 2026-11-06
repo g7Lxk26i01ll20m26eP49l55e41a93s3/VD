@@ -377,7 +377,7 @@ function initCustomPlayerControls() {
       const err = videoEl.error;
       console.error("[Player] Video error:", err);
       if (err && err.code === 4) {
-        showToast("⚠️ Ошибка формата: видео требует faststart или проверьте ссылку");
+        showToast("⚠️ Ошибка формата: загрузите файл _faststart.mp4 из Загрузок на Pixeldrain");
       }
     });
     videoEl.addEventListener("volumechange", updateVolumeUI);
@@ -1338,15 +1338,11 @@ function submitUniversalSearch() {
   let q = input.value.trim();
   if (!q) return;
 
-  // 1. Pixeldrain Link (with or without https://)
-  if (q.includes("pixeldrain.com")) {
-    let pUrl = q;
-    if (!pUrl.startsWith("http://") && !pUrl.startsWith("https://")) {
-      pUrl = "https://" + pUrl;
-    }
-    if (pUrl.includes("/u/")) {
-      pUrl = pUrl.replace("/u/", "/api/file/");
-    }
+  // 1. Pixeldrain Link (flexible regex for pixeldrain.com, xeldrain.com, pd.to, /u/, /api/file/)
+  const pdMatch = q.match(/(?:pixeldrain\.com|xeldrain\.com|pd\.to)\/(?:u\/|api\/file\/)?([a-zA-Z0-9_-]{6,16})/i);
+  if (pdMatch) {
+    const fileId = pdMatch[1];
+    const pUrl = "https://pixeldrain.com/api/file/" + fileId;
     startVideoDirectly({
       url: pUrl,
       type: "mp4",
@@ -1714,6 +1710,42 @@ function appendChatMessage(msg) {
 // ==========================================================================
 // 11. AUTH & USER PROFILE MODAL
 // ==========================================================================
+function attemptSelfHealSession() {
+  const savedProfile = localStorage.getItem("vd_user_profile");
+  const savedCreds = localStorage.getItem("vd_user_credentials");
+  if (!savedProfile && !savedCreds) return;
+
+  let profile = null;
+  try { profile = JSON.parse(savedProfile); } catch(e) {}
+  let creds = null;
+  try { creds = JSON.parse(savedCreds); } catch(e) {}
+
+  if (!profile && !creds) return;
+
+  fetch("/api/auth/self_heal", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ profile: profile, creds: creds })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res && res.success && res.user && res.token) {
+      currentUser = res.user;
+      currentUser.isGuest = false;
+      localStorage.setItem("vd_token", res.token);
+      localStorage.setItem("vd_user_profile", JSON.stringify(res.user));
+      updateHeaderUserAvatar();
+      if (socket && socket.connected) {
+        socket.emit("identify_user", { user_id: currentUser.id });
+      }
+      if (typeof fetchFriendsActivity === "function") {
+        fetchFriendsActivity();
+      }
+    }
+  })
+  .catch(() => {});
+}
+
 function loadAuthSession() {
   const token = localStorage.getItem("vd_token");
   const headers = {};
@@ -1725,6 +1757,7 @@ function loadAuthSession() {
       if (data && data.user) {
         currentUser = data.user;
         currentUser.isGuest = false;
+        localStorage.setItem("vd_user_profile", JSON.stringify(data.user));
         updateHeaderUserAvatar();
         if (socket && socket.connected) {
           socket.emit("identify_user", { user_id: currentUser.id });
@@ -1732,9 +1765,13 @@ function loadAuthSession() {
         if (typeof fetchFriendsActivity === "function") {
           fetchFriendsActivity();
         }
+      } else {
+        attemptSelfHealSession();
       }
     })
-    .catch(() => {});
+    .catch(() => {
+      attemptSelfHealSession();
+    });
 }
 
 function updateHeaderUserAvatar() {
@@ -1992,6 +2029,8 @@ function loginUser() {
         localStorage.setItem("vd_token", data.token);
       }
       currentUser = data.user;
+      localStorage.setItem("vd_user_profile", JSON.stringify(data.user));
+      localStorage.setItem("vd_user_credentials", JSON.stringify({ username: u, password: p }));
       currentUser.isGuest = false;
       updateHeaderUserAvatar();
       closeModal("modal-auth-profile");
@@ -2025,6 +2064,8 @@ function registerUser() {
         localStorage.setItem("vd_token", data.token);
       }
       currentUser = data.user;
+      localStorage.setItem("vd_user_profile", JSON.stringify(data.user));
+      localStorage.setItem("vd_user_credentials", JSON.stringify({ username: u, password: p }));
       currentUser.isGuest = false;
       updateHeaderUserAvatar();
       closeModal("modal-auth-profile");

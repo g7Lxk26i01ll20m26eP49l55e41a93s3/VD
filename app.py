@@ -577,7 +577,7 @@ def api_catalog_stream():
 # ================================= AUTH & USER ACCOUNTS API =================================
 
 def get_current_user() -> Optional[Dict[str, Any]]:
-    token = request.cookies.get("rave_token")
+    token = request.cookies.get("vd_token") or request.cookies.get("rave_token")
     if not token:
         auth_header = request.headers.get("Authorization", "")
         if auth_header.startswith("Bearer "):
@@ -601,6 +601,7 @@ def api_auth_register():
         token = database.create_session(user["id"])
         stats = database.get_user_stats(user["id"])
         resp = jsonify({"success": True, "user": user, "stats": stats, "token": token})
+        resp.set_cookie("vd_token", token, max_age=30*86400, samesite="Lax", httponly=False)
         resp.set_cookie("rave_token", token, max_age=30*86400, samesite="Lax", httponly=False)
         return resp
     except ValueError as e:
@@ -625,6 +626,7 @@ def api_auth_login():
     stats = database.get_user_stats(user["id"])
     history = database.get_user_watch_history(user["id"], limit=15)
     resp = jsonify({"success": True, "user": user, "stats": stats, "history": history, "token": token})
+    resp.set_cookie("vd_token", token, max_age=30*86400, samesite="Lax", httponly=False)
     resp.set_cookie("rave_token", token, max_age=30*86400, samesite="Lax", httponly=False)
     return resp
 
@@ -635,6 +637,40 @@ def api_auth_logout():
         database.delete_session(token)
     resp = jsonify({"success": True})
     resp.delete_cookie("rave_token")
+    return resp
+
+@app.route("/api/auth/self_heal", methods=["POST"])
+def api_auth_self_heal():
+    data = request.get_json(silent=True) or {}
+    profile = data.get("profile") or {}
+    creds = data.get("creds") or {}
+
+    username = clean_text(profile.get("username") or creds.get("username") or "", 30).strip().lower()
+    if not username:
+        return jsonify({"success": False, "error": "No username"}), 400
+
+    user = database.get_user_by_username(username)
+    if not user:
+        display_name = clean_text(profile.get("display_name") or username, 60).strip()
+        pwd = str(creds.get("password") or "vd_pass_2026")
+        avatar = str(profile.get("avatar") or "")
+        try:
+            user = database.create_user(username, display_name, pwd, avatar=avatar)
+            if profile.get("bio"):
+                database.update_user_profile(user["id"], bio=profile.get("bio"))
+            if profile.get("banner_color"):
+                database.update_user_profile(user["id"], banner_color=profile.get("banner_color"))
+        except Exception:
+            user = database.get_user_by_username(username)
+            if not user:
+                return jsonify({"success": False, "error": "Failed to restore user"}), 400
+
+    token = database.create_session(user["id"])
+    stats = database.get_user_stats(user["id"])
+    history = database.get_user_watch_history(user["id"], limit=15)
+    resp = jsonify({"success": True, "user": user, "stats": stats, "history": history, "token": token})
+    resp.set_cookie("vd_token", token, max_age=30*86400, samesite="Lax", httponly=False)
+    resp.set_cookie("rave_token", token, max_age=30*86400, samesite="Lax", httponly=False)
     return resp
 
 @app.route("/api/auth/me")
