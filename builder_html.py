@@ -233,6 +233,11 @@ def GET_HTML():
               <div id="yt-player-target"></div>
             </div>
 
+            <!-- Embed / Balancer Video Slot (For catalog movies/series iframe embeds) -->
+            <div id="embed-player-slot" style="display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 10; background: #000;">
+              <iframe id="embed-player-iframe" style="width: 100%; height: 100%; border: none;" allowfullscreen allow="autoplay; encrypted-media; picture-in-picture; fullscreen"></iframe>
+            </div>
+
             <!-- ============================================================ -->
             <!-- CUSTOM VD CONTROLS OVERLAY (ONLY FOR NATIVE & DISK VIDEOS)   -->
             <!-- ============================================================ -->

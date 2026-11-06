@@ -1048,11 +1048,17 @@ class VideoResolver:
         candidate_urls = []
         if imdb_id and imdb_id.startswith("tt"):
             candidate_urls.append(f"https://api.namy.ws/embed/imdb/{imdb_id}")
+            candidate_urls.append(f"https://collaps.org/embed/imdb/{imdb_id}")
         if kp_id and kp_id.isdigit():
             candidate_urls.append(f"https://api.namy.ws/embed/kp/{kp_id}")
+            candidate_urls.append(f"https://collaps.org/embed/kp/{kp_id}")
         if not candidate_urls:
-            if imdb_id: candidate_urls.append(f"https://api.namy.ws/embed/imdb/{imdb_id}")
-            if kp_id: candidate_urls.append(f"https://api.namy.ws/embed/kp/{kp_id}")
+            if imdb_id:
+                candidate_urls.append(f"https://api.namy.ws/embed/imdb/{imdb_id}")
+                candidate_urls.append(f"https://collaps.org/embed/imdb/{imdb_id}")
+            if kp_id:
+                candidate_urls.append(f"https://api.namy.ws/embed/kp/{kp_id}")
+                candidate_urls.append(f"https://collaps.org/embed/kp/{kp_id}")
 
         html = None
         for u in candidate_urls:
@@ -1200,11 +1206,33 @@ class VideoResolver:
         # Always obtain a fresh signed embed token to prevent 410 Gone / expired token errors
         details = cls.get_media_details(kp_id=kp_id, imdb_id=imdb_id, force_fresh=True)
         if details.get("error"):
+            embed_url = ""
+            if kp_id and str(kp_id).isdigit():
+                embed_url = f"https://api.namy.ws/embed/kp/{kp_id}"
+            elif imdb_id and str(imdb_id).startswith("tt"):
+                embed_url = f"https://api.namy.ws/embed/imdb/{imdb_id}"
+            elif kp_id:
+                embed_url = f"https://api.namy.ws/embed/kp/{kp_id}"
+            if embed_url:
+                return {
+                    "type": "embed",
+                    "url": embed_url,
+                    "title": details.get("title") or "Фильм",
+                    "source": "embed_fallback"
+                }
             return {"type": "none", "url": "", "error": details["error"]}
 
         if details.get("type") == "movie":
             raw_hls = details.get("hls", "")
-            proxied_hls = f"/api/hls/proxy?url={urllib.parse.quote(raw_hls, safe='')}" if raw_hls else ""
+            if not raw_hls:
+                embed_url = f"https://api.namy.ws/embed/kp/{kp_id}" if kp_id else f"https://api.namy.ws/embed/imdb/{imdb_id}"
+                return {
+                    "type": "embed",
+                    "url": embed_url,
+                    "title": details.get("title", "Фильм"),
+                    "source": "embed_fallback"
+                }
+            proxied_hls = f"/api/hls/proxy?url={urllib.parse.quote(raw_hls, safe='')}"
             return {
                 "type": "hls",
                 "url": proxied_hls,
@@ -1241,7 +1269,15 @@ class VideoResolver:
             if target_episode:
                 ep_title = f"{details.get('title', 'Сериал')} (Сезон {target_season.get('season')}, Серия {target_episode.get('episode')})"
                 raw_hls = target_episode.get("hls", "")
-                proxied_hls = f"/api/hls/proxy?url={urllib.parse.quote(raw_hls, safe='')}" if raw_hls else ""
+                if not raw_hls:
+                    embed_url = f"https://api.namy.ws/embed/kp/{kp_id}" if kp_id else f"https://api.namy.ws/embed/imdb/{imdb_id}"
+                    return {
+                        "type": "embed",
+                        "url": embed_url,
+                        "title": ep_title,
+                        "source": "embed_fallback"
+                    }
+                proxied_hls = f"/api/hls/proxy?url={urllib.parse.quote(raw_hls, safe='')}"
                 return {
                     "type": "hls",
                     "url": proxied_hls,

@@ -331,6 +331,46 @@ function copyInviteLink() {
 }
 
 // ==========================================================================
+// ==========================================================================
+// SCREEN WAKELOCK API (Keeps screen awake on mobile and desktop during playback)
+// ==========================================================================
+let wakeLockSentinel = null;
+
+async function requestWakeLock() {
+  if (!("wakeLock" in navigator)) return;
+  if (wakeLockSentinel && !wakeLockSentinel.released) return;
+  try {
+    wakeLockSentinel = await navigator.wakeLock.request("screen");
+    wakeLockSentinel.addEventListener("release", () => {
+      wakeLockSentinel = null;
+    });
+    console.log("[VD] Screen WakeLock acquired");
+  } catch (e) {
+    wakeLockSentinel = null;
+  }
+}
+
+async function releaseWakeLock() {
+  if (wakeLockSentinel) {
+    try {
+      await wakeLockSentinel.release();
+    } catch (e) {}
+    wakeLockSentinel = null;
+    console.log("[VD] Screen WakeLock released");
+  }
+}
+
+document.addEventListener("visibilitychange", async () => {
+  if (document.visibilityState === "visible") {
+    const isPlaying = (currentVideo && currentVideo.playing) ||
+      (currentType === "youtube" && ytPlayer && typeof ytPlayer.getPlayerState === "function" && ytPlayer.getPlayerState() === 1) ||
+      (currentType !== "youtube" && (() => { const v = document.getElementById("rave-video-el"); return v && !v.paused && !v.ended; })());
+    if (isPlaying) {
+      await requestWakeLock();
+    }
+  }
+});
+
 // 6. ROCK-SOLID PLAYER ENGINE & CUSTOM CONTROLS OVERLAY
 // ==========================================================================
 function initCustomPlayerControls() {
@@ -357,15 +397,20 @@ function initCustomPlayerControls() {
     videoEl.addEventListener("progress", onVideoBufferProgress);
     videoEl.addEventListener("loadedmetadata", onVideoLoadedMetadata);
     videoEl.addEventListener("play", () => {
+      requestWakeLock();
       updatePlayPauseUI(true);
       flashPlayPauseIcon(true);
     });
     videoEl.addEventListener("pause", () => {
+      releaseWakeLock();
       updatePlayPauseUI(false);
       flashPlayPauseIcon(false);
       if (stage) stage.classList.remove("controls-hidden");
     });
-    videoEl.addEventListener("ended", onVideoEnded);
+    videoEl.addEventListener("ended", () => {
+      releaseWakeLock();
+      onVideoEnded();
+    });
     videoEl.addEventListener("error", function() {
       const err = videoEl.error;
       console.error("[Player] Video error:", err);
@@ -802,6 +847,12 @@ function stopAndTearDownAllPlayers() {
       videoEl.style.display = "none";
     } catch(e) {}
   }
+  const embedSlot = document.getElementById("embed-player-slot");
+  const embedIframe = document.getElementById("embed-player-iframe");
+  if (embedSlot) embedSlot.style.display = "none";
+  if (embedIframe) embedIframe.src = "about:blank";
+  releaseWakeLock();
+
   currentVideo = { type: "none", url: "", id: "", title: "", duration: 0, playing: false, time: 0, updated_at: 0 };
   currentType = "none";
   isBuffering = false;
@@ -838,16 +889,18 @@ function renderPlayer(video) {
     window.currentVideo = currentVideo;
     isApplyingRemoteEvent = true;
     if (video.playing) {
+      requestWakeLock();
       if (currentType === "youtube" && ytPlayer && ytPlayer.playVideo) {
         try { ytPlayer.playVideo(); } catch(e) {}
-      } else if (currentType !== "youtube") {
+      } else if (currentType !== "youtube" && currentType !== "embed" && currentType !== "iframe") {
         const el = document.getElementById("rave-video-el");
         if (el && el.paused) safePlayMedia(el);
       }
     } else {
+      releaseWakeLock();
       if (currentType === "youtube" && ytPlayer && ytPlayer.pauseVideo) {
         try { ytPlayer.pauseVideo(); } catch(e) {}
-      } else if (currentType !== "youtube") {
+      } else if (currentType !== "youtube" && currentType !== "embed" && currentType !== "iframe") {
         const el = document.getElementById("rave-video-el");
         if (el && !el.paused) el.pause();
       }
@@ -868,9 +921,12 @@ function renderPlayer(video) {
   const videoEl = document.getElementById("rave-video-el");
   const slot = document.getElementById("yt-player-slot");
   const customOverlay = document.getElementById("vd-player-overlay");
+  const embedSlot = document.getElementById("embed-player-slot");
+  const embedIframe = document.getElementById("embed-player-iframe");
 
   if (currentType === "youtube") {
-    // Hide HTML5 video and completely HIDE custom controls overlay so YouTube native controls have zero interference
+    // Hide HTML5 video and embed player, show YouTube
+    if (embedSlot) { embedSlot.style.display = "none"; if (embedIframe) embedIframe.src = "about:blank"; }
     if (hlsPlayer) { try { hlsPlayer.destroy(); } catch(e) {} hlsPlayer = null; }
     if (videoEl) {
       try {
@@ -885,8 +941,31 @@ function renderPlayer(video) {
       customOverlay.style.display = "none";
     }
     mountYouTubeVideo(currentVideo.id || extractYouTubeId(currentVideo.url));
+  } else if (currentType === "embed" || currentType === "iframe") {
+    // Hide HTML5 video and YouTube, show Embed player (catalog balancer)
+    if (hlsPlayer) { try { hlsPlayer.destroy(); } catch(e) {} hlsPlayer = null; }
+    if (videoEl) {
+      try {
+        videoEl.pause();
+        videoEl.removeAttribute("src");
+        videoEl.load();
+        videoEl.style.display = "none";
+      } catch(e) {}
+    }
+    resetYouTubeDOMTarget();
+    if (slot) slot.style.display = "none";
+    if (customOverlay) customOverlay.style.display = "none";
+
+    if (embedSlot && embedIframe) {
+      embedSlot.style.display = "block";
+      if (embedIframe.src !== currentVideo.url) {
+        embedIframe.src = currentVideo.url;
+      }
+    }
+    requestWakeLock();
   } else {
-    // Hide YouTube, show native video with full custom controls
+    // Native HTML5 / HLS / MP4
+    if (embedSlot) { embedSlot.style.display = "none"; if (embedIframe) embedIframe.src = "about:blank"; }
     resetYouTubeDOMTarget();
     if (slot) slot.style.display = "none";
     if (customOverlay) {
@@ -902,8 +981,6 @@ function renderPlayer(video) {
     }
   }
 }
-
-// YOUTUBE API MOUNTING
 function initYouTubeApi() {
   if (window.YT && window.YT.Player) {
     ytApiReady = true;
@@ -1008,8 +1085,10 @@ function onYouTubeStateChange(event) {
 
   // User clicked Play inside native YouTube player
   if (state === 0 || (typeof YT !== "undefined" && state === YT.PlayerState.ENDED)) {
+    releaseWakeLock();
     onVideoEnded();
   } else if (state === YT.PlayerState.PLAYING) {
+    requestWakeLock();
     currentVideo.playing = true;
     currentVideo.time = curTime;
     currentVideo.updated_at = serverNow();
@@ -1021,6 +1100,7 @@ function onYouTubeStateChange(event) {
 
   // User clicked Pause inside native YouTube player
   if (state === YT.PlayerState.PAUSED) {
+    releaseWakeLock();
     currentVideo.playing = false;
     currentVideo.time = curTime;
     currentVideo.updated_at = serverNow();
@@ -1038,8 +1118,10 @@ function safePlayMedia(el) {
     return;
   }
   const p = el.play();
-  if (p && typeof p.catch === 'function') {
-    p.catch(err => {
+  if (p && typeof p.then === 'function') {
+    p.then(() => {
+      requestWakeLock();
+    }).catch(err => {
       if (err.name === 'NotAllowedError') {
         el.muted = true;
         if (currentVideo && currentVideo.playing) {
@@ -1123,6 +1205,7 @@ function mountHTML5Video(videoEl, video) {
   // Capture native player gestures (spacebar on focused video, click on video, media keys, PiP)
   // and sync state reliably across clients without loops.
   videoEl.onplay = function() {
+    requestWakeLock();
     updatePlayPauseIcons(true);
     if (!isApplyingRemoteEvent && !videoEl.seeking && currentVideo && !currentVideo.playing) {
       currentVideo.playing = true;
@@ -1140,6 +1223,7 @@ function mountHTML5Video(videoEl, video) {
   };
 
   videoEl.onpause = function() {
+    releaseWakeLock();
     updatePlayPauseIcons(false);
     if (!isApplyingRemoteEvent && !videoEl.seeking && currentVideo && currentVideo.playing) {
       currentVideo.playing = false;
@@ -1554,20 +1638,19 @@ function openSearchModalTab(source, query) {
   const titleEl = document.getElementById("search-modal-title");
   const input = document.getElementById("modal-search-input");
   if (titleEl) {
-    titleEl.textContent = source === "movies" ? "Поиск фильмов" : (source === "youtube" ? "Поиск YouTube" : "Каталог видео");
+    titleEl.textContent = source === "movies" ? "Каталог фильмов и сериалов" : (source === "youtube" ? "Поиск YouTube" : "Каталог видео");
   }
-  if (query && input) {
-    input.value = query;
-    executeModalSearch();
+  if (input) {
+    input.value = query || "";
   }
+  executeModalSearch();
 }
 
 function executeModalSearch() {
   const input = document.getElementById("modal-search-input");
   const container = document.getElementById("modal-search-results");
-  if (!input || !container) return;
-  let q = input.value.trim();
-  if (!q) return;
+  if (!container) return;
+  let q = input ? input.value.trim() : "";
 
   if (q.includes("pixeldrain.com/u/")) {
     q = q.replace("pixeldrain.com/u/", "pixeldrain.com/api/file/");
@@ -1582,7 +1665,7 @@ function executeModalSearch() {
       title: "Прямое видео",
       duration: 0
     });
-    input.value = "";
+    if (input) input.value = "";
     return;
   }
 
@@ -1599,22 +1682,41 @@ function executeModalSearch() {
       container.innerHTML = "";
       results.forEach(res => {
         const card = document.createElement("div");
-        card.style.cssText = "background:var(--bg-card); border:1px solid var(--border-color); border-radius:10px; padding:10px; cursor:pointer; display:flex; flex-direction:column; gap:8px;";
+        card.style.cssText = "background:var(--bg-card); border:1px solid var(--border-color); border-radius:10px; padding:10px; cursor:pointer; display:flex; flex-direction:column; gap:8px; transition: transform 0.15s, border-color 0.15s;";
+        card.onmouseover = () => { card.style.borderColor = "var(--primary)"; };
+        card.onmouseout = () => { card.style.borderColor = "var(--border-color)"; };
+
         const poster = res.poster || "/static/img/poster-fallback.jpg";
+        const yearBadge = res.year ? `<span style="font-size:0.7rem; color:var(--text-muted);">${escapeHTML(res.year)}</span>` : "";
+        const typeBadge = res.type === "series" ? `<span style="font-size:0.68rem; background:rgba(245,158,11,0.2); color:#f59e0b; padding:1px 5px; border-radius:4px; font-weight:600;">Сериал</span>` : (res.type === "movie" ? `<span style="font-size:0.68rem; background:rgba(56,189,248,0.2); color:#38bdf8; padding:1px 5px; border-radius:4px; font-weight:600;">Фильм</span>` : "");
+
         card.innerHTML = `
-          <div style="width:100%; height:130px; border-radius:6px; overflow:hidden; background:#000;">
+          <div style="width:100%; height:130px; border-radius:6px; overflow:hidden; background:#000; position:relative;">
             <img src="${escapeHTML(poster)}" style="width:100%; height:100%; object-fit:cover;" onerror="this.src='/static/img/poster-fallback.jpg'">
+            <div style="position:absolute; top:6px; right:6px; display:flex; gap:4px;">${typeBadge}</div>
           </div>
-          <span style="font-weight:600; font-size:0.85rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(res.title || 'Видео')}</span>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-weight:600; font-size:0.85rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">${escapeHTML(res.title || 'Видео')}</span>
+            ${yearBadge}
+          </div>
         `;
         card.onclick = () => {
           closeModal("modal-search-content");
-          startVideoDirectly({
-            url: res.url,
-            type: res.type || "mp4",
-            title: res.title || "Видео",
-            duration: res.duration || 0
-          });
+          if (res.url) {
+            startVideoDirectly({
+              url: res.url,
+              id: res.id || "",
+              type: res.type || (res.url.includes(".m3u8") ? "hls" : "mp4"),
+              title: res.title || "Видео",
+              duration: res.duration || 0
+            });
+          } else if (res.teleportal) {
+            playTeleportalShow(res);
+          } else if (res.kp_id || res.imdb_id) {
+            playCatalogMedia(res);
+          } else {
+            showToast("Не удалось определить поток видео");
+          }
         };
         container.appendChild(card);
       });
@@ -1624,7 +1726,77 @@ function executeModalSearch() {
     });
 }
 
-// ==========================================================================
+function playCatalogMedia(item) {
+  showToast(`🔍 Загрузка: ${item.title || 'Фильм'}...`);
+  const kp = item.kp_id || "";
+  const imdb = item.imdb_id || "";
+  const isSeries = item.type === "series";
+
+  const streamUrl = isSeries
+    ? `/api/catalog/stream?kp=${encodeURIComponent(kp)}&imdb=${encodeURIComponent(imdb)}&season=1&episode=1`
+    : `/api/catalog/stream?kp=${encodeURIComponent(kp)}&imdb=${encodeURIComponent(imdb)}`;
+
+  fetch(streamUrl)
+    .then(r => r.json())
+    .then(stream => {
+      if (stream && stream.url) {
+        startVideoDirectly({
+          url: stream.url,
+          type: stream.type || "hls",
+          title: stream.title || item.title || "Фильм",
+          duration: stream.duration || 0,
+          audio_tracks: stream.audio_tracks || []
+        });
+      } else {
+        // Fallback to embed balancer if stream extraction returns none
+        const embedUrl = kp ? `https://api.namy.ws/embed/kp/${kp}` : `https://api.namy.ws/embed/imdb/${imdb}`;
+        startVideoDirectly({
+          url: embedUrl,
+          type: "embed",
+          title: item.title || "Фильм",
+          duration: 0
+        });
+      }
+    })
+    .catch(() => {
+      const embedUrl = kp ? `https://api.namy.ws/embed/kp/${kp}` : `https://api.namy.ws/embed/imdb/${imdb}`;
+      startVideoDirectly({
+        url: embedUrl,
+        type: "embed",
+        title: item.title || "Фильм",
+        duration: 0
+      });
+    });
+}
+
+function playTeleportalShow(item) {
+  const tp = item.teleportal || {};
+  showToast(`🔍 Загрузка: ${item.title}...`);
+  fetch(`/api/project?type=${tp.type || 'show'}&channel=${tp.channel || 'stb'}&project=${tp.project || 'supermama'}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data.seasons && data.seasons.length && data.seasons[0].episodes && data.seasons[0].episodes.length) {
+        const ep = data.seasons[0].episodes[0];
+        if (ep.hash) {
+          fetch(`/api/resolve_hash?hash=${ep.hash}`)
+            .then(r => r.json())
+            .then(res => {
+              if (res && res.url) {
+                startVideoDirectly({
+                  url: res.url,
+                  type: "hls",
+                  title: `${item.title} - ${ep.title}`,
+                  duration: ep.duration || 0
+                });
+              }
+            });
+        }
+      }
+    })
+    .catch(() => {
+      showToast("Не удалось загрузить выпуск");
+    });
+}
 // 10. CHAT & MESSAGING
 // ==========================================================================
 const seenChatMsgIds = new Set();
