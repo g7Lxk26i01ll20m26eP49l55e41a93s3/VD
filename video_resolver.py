@@ -478,11 +478,22 @@ class VideoResolver:
         m_pixel = re.search(r'pixeldrain\.com/(?:u|api/file)/([a-zA-Z0-9_-]+)', url)
         if m_pixel:
             fid = m_pixel.group(1)
+            direct_url = f"https://pixeldrain.com/api/file/{fid}"
+            p_title = "Pixeldrain Video"
+            p_poster = f"https://pixeldrain.com/api/file/{fid}/thumbnail"
+            try:
+                r_info = requests.get(f"https://pixeldrain.com/api/file/{fid}/info", timeout=2.5, headers={"User-Agent": "Mozilla/5.0"})
+                if r_info.status_code == 200:
+                    info_json = r_info.json()
+                    if info_json.get("name"):
+                        p_title = info_json["name"]
+            except Exception:
+                pass
             return {
                 "type": "mp4",
-                "url": f"https://pixeldrain.com/api/file/{fid}",
-                "title": "Pixeldrain Video",
-                "poster": "",
+                "url": direct_url,
+                "title": p_title,
+                "poster": p_poster,
                 "duration": 0
             }
 

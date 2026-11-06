@@ -53,12 +53,6 @@ def GET_HTML():
           <span class="header-btn-label">Пригласить</span>
         </button>
 
-        <button class="header-btn" id="btn-header-disk" onclick="openDiskModal()" style="display: none;" title="Видео с ПК (0 сек задержка, любой размер)">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-          </svg>
-          <span class="header-btn-label">Файлы с ПК</span>
-        </button>
 
         <button class="header-btn" id="btn-toggle-chat" onclick="toggleChatSidebar()" style="display: none;" title="Скрыть/показать чат (Клавиша C)">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -86,11 +80,6 @@ def GET_HTML():
           <span id="header-ping-text">-- ms</span>
         </button>
 
-        <!-- Room Friend Quick Invite Button (Only visible in room) -->
-        <button class="header-btn" id="btn-room-invite-friend" onclick="inviteFriendFromRoom()" style="display: none; background: rgba(168, 85, 247, 0.15); border-color: rgba(168, 85, 247, 0.4); color: #c084fc; font-weight: 600;" title="Позвать друга в кинозал в 1 клик">
-          <span style="font-size: 13px;">🍿</span>
-          <span class="header-btn-label" id="btn-room-invite-label">Позвать друга</span>
-        </button>
 
         <!-- Rooms Modal Button (Header) -->
         <button class="header-btn" id="btn-header-rooms" onclick="openRoomsModal()" title="Список активных комнат (до 24 часов)">
@@ -203,16 +192,7 @@ def GET_HTML():
             <div class="source-card-desc">Любые видео и шоу с YouTube синхронно.</div>
           </div>
 
-          <div class="source-card" onclick="openDiskModal()">
-            <div class="source-card-icon" style="color: #10b981;">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
-                <polyline points="13 2 13 9 20 9"></polyline>
-              </svg>
-            </div>
-            <div class="source-card-title">Файлы с ПК</div>
-            <div class="source-card-desc">Мгновенный запуск любого видео с диска за 0 сек.</div>
-          </div>
+
 
           <div class="source-card" onclick="openSearchModalTab('series')">
             <div class="source-card-icon" style="color: #f59e0b;">
@@ -413,7 +393,7 @@ def GET_HTML():
               <div class="empty-actions-row">
                 <button class="header-btn" onclick="openSearchModalTab('movies')">🎬 Фильмы и Сериалы</button>
                 <button class="header-btn" onclick="openSearchModalTab('youtube')">📺 YouTube</button>
-                <button class="header-btn" onclick="openDiskModal()">📁 Файл с ПК</button>
+                
                 <button class="header-btn" onclick="openSearchModalTab('url')">🔗 Прямая ссылка</button>
               </div>
             </div>

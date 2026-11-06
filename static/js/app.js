@@ -216,10 +216,8 @@ function showLobbyView() {
     "header-center-search",
     "header-catchup-pill",
     "btn-copy-room-link",
-    "btn-header-disk",
     "btn-toggle-chat",
     "btn-toggle-queue",
-    "btn-room-invite-friend"
   ];
   roomElementsToHide.forEach(id => {
     const el = document.getElementById(id);
@@ -243,10 +241,8 @@ function showRoomView() {
   const roomElementsToShow = [
     "header-room-pill",
     "btn-copy-room-link",
-    "btn-header-disk",
     "btn-toggle-chat",
     "btn-toggle-queue",
-    "btn-room-invite-friend"
   ];
   roomElementsToShow.forEach(id => {
     const el = document.getElementById(id);
@@ -370,6 +366,13 @@ function initCustomPlayerControls() {
       if (stage) stage.classList.remove("controls-hidden");
     });
     videoEl.addEventListener("ended", onVideoEnded);
+    videoEl.addEventListener("error", function() {
+      const err = videoEl.error;
+      console.error("[Player] Video error:", err);
+      if (err && err.code === 4) {
+        showToast("⚠️ Ошибка формата: видео требует faststart или проверьте ссылку");
+      }
+    });
     videoEl.addEventListener("volumechange", updateVolumeUI);
   }
 
@@ -1325,14 +1328,37 @@ function updateBufferStatusToServer(buffering) {
 function submitUniversalSearch() {
   const input = document.getElementById("universal-search-input");
   if (!input) return;
-  const q = input.value.trim();
+  let q = input.value.trim();
   if (!q) return;
 
-  // 1. YouTube Link
+  // 1. Pixeldrain Link (with or without https://)
+  if (q.includes("pixeldrain.com")) {
+    let pUrl = q;
+    if (!pUrl.startsWith("http://") && !pUrl.startsWith("https://")) {
+      pUrl = "https://" + pUrl;
+    }
+    if (pUrl.includes("/u/")) {
+      pUrl = pUrl.replace("/u/", "/api/file/");
+    }
+    startVideoDirectly({
+      url: pUrl,
+      type: "mp4",
+      title: "Pixeldrain Видео",
+      duration: 0
+    });
+    input.value = "";
+    return;
+  }
+
+  // 2. YouTube Link
   const ytId = extractYouTubeId(q);
   if (ytId) {
+    let ytUrl = q;
+    if (!ytUrl.startsWith("http://") && !ytUrl.startsWith("https://")) {
+      ytUrl = "https://" + ytUrl;
+    }
     startVideoDirectly({
-      url: q,
+      url: ytUrl,
       id: ytId,
       type: "youtube",
       title: "YouTube видео",
@@ -1342,24 +1368,18 @@ function submitUniversalSearch() {
     return;
   }
 
-  // 2. Direct HLS or MP4 stream (including Pixeldrain)
-  if (q.includes("pixeldrain.com/u/")) {
-    q = q.replace("pixeldrain.com/u/", "pixeldrain.com/api/file/");
-  }
-  if (q.includes(".m3u8") || q.endsWith(".mp4") || q.startsWith("http://") || q.startsWith("https://")) {
+  // 3. Direct HLS or MP4 stream
+  if (q.includes(".m3u8") || q.includes(".mp4") || q.startsWith("http://") || q.startsWith("https://")) {
+    let sUrl = q;
+    if (!sUrl.startsWith("http://") && !sUrl.startsWith("https://")) {
+      sUrl = "https://" + sUrl;
+    }
     startVideoDirectly({
-      url: q,
-      type: q.includes(".m3u8") ? "hls" : "mp4",
+      url: sUrl,
+      type: sUrl.includes(".m3u8") ? "hls" : "mp4",
       title: "Прямой видеопоток",
       duration: 0
     });
-    input.value = "";
-    return;
-  }
-
-  // 3. Local disk path (e.g. D:\Holos\Холостяк.mp4 or D:\HolosХолостяк.mp4)
-  if (/^[a-zA-Z]:[\\\/]/.test(q)) {
-    launchDiskPath(q);
     input.value = "";
     return;
   }

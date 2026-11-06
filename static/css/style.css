@@ -2062,3 +2062,221 @@ a {
   border-radius: 12px;
   margin: 10px 0;
 }
+
+/* ========================================================================== */
+/* MOBILE RESPONSIVE OPTIMIZATIONS (SMARTPHONES & TABLETS)                    */
+/* ========================================================================== */
+@media (max-width: 768px) {
+  :root {
+    --header-height: 48px;
+    --sidebar-width: 100%;
+  }
+
+  /* Safe Area for iOS Notch & Dynamic Viewport Height */
+  html, body {
+    height: 100%;
+    height: 100dvh;
+    overflow-x: hidden;
+  }
+
+  .app-container {
+    height: 100dvh;
+  }
+
+  /* Header on Mobile: Zero horizontal overflow */
+  .app-header {
+    padding: 0 6px;
+    gap: 4px;
+    overflow-x: hidden;
+    height: var(--header-height);
+  }
+  .header-left {
+    gap: 4px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
+  .app-brand {
+    padding: 2px 4px;
+    gap: 4px;
+  }
+  .brand-monogram {
+    width: 28px;
+    height: 28px;
+    font-size: 0.85rem;
+  }
+  .header-room-pill {
+    padding: 2px 6px;
+    font-size: 0.68rem;
+    max-width: 75px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Hide textual labels on header buttons on mobile to fit nicely */
+  .header-btn .header-btn-label {
+    display: none !important;
+  }
+  .header-btn {
+    padding: 5px 6px !important;
+    font-size: 0.75rem;
+    min-width: 28px;
+    height: 30px;
+    justify-content: center;
+    border-radius: 6px;
+  }
+  .header-right {
+    gap: 3px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+  }
+  /* Hide non-essential ping indicator and copy link button on phone screens to give room to controls */
+  .header-ping-pill, #btn-copy-room-link {
+    display: none !important;
+  }
+  .user-header-profile {
+    padding: 2px 4px;
+    gap: 4px;
+  }
+  .header-username {
+    display: none;
+  }
+  .header-avatar {
+    width: 26px;
+    height: 26px;
+    font-size: 0.75rem;
+  }
+
+  /* Universal Search Bar on Mobile */
+  .header-center {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    margin: 0 4px;
+    display: flex;
+    justify-content: center;
+  }
+  .universal-search-bar {
+    width: 100%;
+    min-width: 0;
+    padding: 2px 4px 2px 8px;
+    height: 30px;
+    gap: 4px;
+  }
+  .universal-search-input {
+    font-size: 0.8rem;
+    min-width: 0;
+  }
+  .search-submit-btn {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+  }
+
+  /* Workspace on Mobile */
+  .app-workspace {
+    height: calc(100dvh - var(--header-height));
+  }
+  .view-pane.room-view {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  /* Player Area on Mobile: Full Width 16:9 */
+  .room-player-column {
+    flex: 1 1 auto;
+    width: 100% !important;
+    min-width: 100% !important;
+  }
+  .player-stage-wrap {
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 16 / 9;
+    border-radius: 0;
+  }
+
+  /* Touch-friendly player controls */
+  .player-ctrl-btn {
+    min-width: 36px;
+    min-height: 36px;
+    padding: 6px;
+  }
+  .player-timeline-container {
+    height: 22px;
+  }
+  .player-timeline-track {
+    height: 5px;
+  }
+  .player-timeline-thumb {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* Chat Sidebar on Mobile: Floating Slide-in Drawer */
+  .room-sidebar {
+    position: fixed;
+    top: var(--header-height);
+    right: 0;
+    bottom: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    z-index: 1000;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.7);
+    background: var(--bg-surface);
+  }
+  .room-sidebar.collapsed {
+    display: none !important;
+  }
+
+  /* Lobby on Mobile */
+  .lobby-hero {
+    padding: 24px 12px;
+  }
+  .lobby-hero-title {
+    font-size: clamp(1.4rem, 6vw, 2.2rem) !important;
+    line-height: 1.25;
+  }
+  .lobby-hero-subtitle {
+    font-size: 0.88rem;
+    padding: 0 8px;
+  }
+  .lobby-action-buttons {
+    flex-direction: column;
+    width: 100%;
+    gap: 8px;
+    padding: 0 12px;
+  }
+  .btn-hero-create, .btn-hero-join {
+    width: 100%;
+    justify-content: center;
+    padding: 12px 20px;
+  }
+
+  /* Modals on Mobile: Touch-friendly */
+  .modal-dialog {
+    width: 95% !important;
+    max-width: 95% !important;
+    max-height: 85dvh !important;
+    margin: auto !important;
+    border-radius: 14px !important;
+  }
+  .modal-dialog input, .modal-dialog select, .modal-dialog textarea {
+    font-size: 16px !important; /* Prevents auto-zoom on iOS Safari */
+  }
+
+  /* Room Empty State on Mobile */
+  .empty-player-placeholder {
+    padding: 24px 12px;
+  }
+  .empty-title {
+    font-size: 1.15rem;
+  }
+  .empty-actions-row {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+}
+
