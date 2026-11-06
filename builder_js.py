@@ -1093,7 +1093,11 @@ function mountHTML5Video(videoEl, video) {
       setTimeout(() => { isApplyingRemoteEvent = false; }, 800);
     });
   } else {
-    videoEl.src = video.url;
+    let playUrl = video.url || "";
+    if (playUrl.includes("pixeldrain.com") && !playUrl.includes("/api/proxy/stream")) {
+      playUrl = "/api/proxy/stream?url=" + encodeURIComponent(playUrl);
+    }
+    videoEl.src = playUrl;
     if (targetTime > 0) {
       try { videoEl.currentTime = targetTime; } catch(e) {}
     }
@@ -1342,9 +1346,10 @@ function submitUniversalSearch() {
   const pdMatch = q.match(/(?:pixeldrain\.com|xeldrain\.com|pd\.to)\/(?:u\/|api\/file\/)?([a-zA-Z0-9_-]{6,16})/i);
   if (pdMatch) {
     const fileId = pdMatch[1];
-    const pUrl = "https://pixeldrain.com/api/file/" + fileId;
+    const rawUrl = "https://pixeldrain.com/api/file/" + fileId;
+    const proxiedUrl = "/api/proxy/stream?url=" + encodeURIComponent(rawUrl);
     startVideoDirectly({
-      url: pUrl,
+      url: proxiedUrl,
       type: "mp4",
       title: "Pixeldrain Видео",
       duration: 0

@@ -474,11 +474,12 @@ class VideoResolver:
                 "duration": 0
             }
 
-        # Pixeldrain direct stream
-        m_pixel = re.search(r'pixeldrain\.com/(?:u|api/file)/([a-zA-Z0-9_-]+)', url)
+        # Pixeldrain direct stream (wrapped via proxy to eliminate ORB blocking)
+        m_pixel = re.search(r'(?:pixeldrain\.com|xeldrain\.com|pd\.to)/(?:u|api/file)/([a-zA-Z0-9_-]+)', url)
         if m_pixel:
             fid = m_pixel.group(1)
             direct_url = f"https://pixeldrain.com/api/file/{fid}"
+            proxied_url = f"/api/proxy/stream?url={urllib.parse.quote(direct_url, safe='')}"
             p_title = "Pixeldrain Video"
             p_poster = f"https://pixeldrain.com/api/file/{fid}/thumbnail"
             try:
@@ -491,7 +492,7 @@ class VideoResolver:
                 pass
             return {
                 "type": "mp4",
-                "url": direct_url,
+                "url": proxied_url,
                 "title": p_title,
                 "poster": p_poster,
                 "duration": 0
