@@ -50,7 +50,7 @@ def backup_database_to_json():
             cursor.execute("SELECT user_id, friend_id, status, created_at FROM friends")
             friends = [dict(r) for r in cursor.fetchall()]
 
-            cursor.execute("SELECT user_id, title, poster, url, media_type, duration_sec, watched_sec, updated_at FROM watch_history")
+            cursor.execute("SELECT user_id, title, poster, url, media_type, duration_sec, watched_sec, updated_at FROM watch_history ORDER BY updated_at DESC LIMIT 100")
             history = [dict(r) for r in cursor.fetchall()]
 
         cursor.execute("SELECT token, user_id, created_at, expires_at FROM auth_sessions WHERE expires_at > ?", (time.time(),))
