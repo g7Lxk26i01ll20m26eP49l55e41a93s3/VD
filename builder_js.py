@@ -172,17 +172,20 @@ function setChatSidebarCollapsed(collapsed) {
   const roomView = document.getElementById("view-room");
   const floatBtnText = document.getElementById("btn-floating-chat-text");
   const headerBtnLabel = document.getElementById("btn-toggle-chat-label");
+  const floatPill = document.getElementById("btn-floating-chat-pill");
   if (!roomView) return;
 
   if (collapsed) {
     roomView.classList.add("chat-collapsed");
     if (floatBtnText) floatBtnText.textContent = "Показать чат";
     if (headerBtnLabel) headerBtnLabel.textContent = "Чат (скрыт)";
+    if (floatPill) floatPill.style.display = "inline-flex";
     localStorage.setItem("vd_chat_collapsed", "true");
   } else {
     roomView.classList.remove("chat-collapsed");
     if (floatBtnText) floatBtnText.textContent = "Скрыть чат";
     if (headerBtnLabel) headerBtnLabel.textContent = "Чат";
+    if (floatPill) floatPill.style.display = "none";
     localStorage.setItem("vd_chat_collapsed", "false");
     const box = document.getElementById("chat-messages");
     if (box) box.scrollTop = box.scrollHeight;
@@ -477,7 +480,7 @@ function initCustomPlayerControls() {
     }, { passive: true });
   }
 
-  // Gesture Layer (Double clicks for -10s / +10s / Fullscreen, single click for Play/Pause)
+  // Gesture Layer (Double clicks & touches for -10s / +10s / Fullscreen, single click/touch for Controls)
   const zoneLeft = document.getElementById("zone-seek-left");
   const zoneRight = document.getElementById("zone-seek-right");
   const zoneCenter = document.getElementById("zone-center-play");
@@ -487,13 +490,39 @@ function initCustomPlayerControls() {
       e.stopPropagation();
       seekRelative(-10);
     });
+    let lastLeftTouch = 0;
+    zoneLeft.addEventListener("touchend", function(e) {
+      const now = Date.now();
+      if (now - lastLeftTouch < 340) {
+        e.preventDefault();
+        e.stopPropagation();
+        seekRelative(-10);
+        lastLeftTouch = 0;
+      } else {
+        lastLeftTouch = now;
+      }
+    }, { passive: false });
   }
+
   if (zoneRight) {
     zoneRight.addEventListener("dblclick", function(e) {
       e.stopPropagation();
       seekRelative(10);
     });
+    let lastRightTouch = 0;
+    zoneRight.addEventListener("touchend", function(e) {
+      const now = Date.now();
+      if (now - lastRightTouch < 340) {
+        e.preventDefault();
+        e.stopPropagation();
+        seekRelative(10);
+        lastRightTouch = 0;
+      } else {
+        lastRightTouch = now;
+      }
+    }, { passive: false });
   }
+
   if (zoneCenter) {
     let clickTimeout = null;
     zoneCenter.addEventListener("click", function(e) {
@@ -508,6 +537,33 @@ function initCustomPlayerControls() {
         }, 220);
       }
     });
+
+    let lastCenterTouch = 0;
+    let centerTouchTimer = null;
+    zoneCenter.addEventListener("touchend", function(e) {
+      const now = Date.now();
+      if (now - lastCenterTouch < 340) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (centerTouchTimer) clearTimeout(centerTouchTimer);
+        centerTouchTimer = null;
+        lastCenterTouch = 0;
+        toggleStageFullscreen();
+      } else {
+        lastCenterTouch = now;
+        centerTouchTimer = setTimeout(() => {
+          centerTouchTimer = null;
+          const stage = document.getElementById("player-stage-wrap");
+          if (stage) {
+            if (stage.classList.contains("controls-hidden")) {
+              handlePlayerStageMouseMove();
+            } else {
+              stage.classList.add("controls-hidden");
+            }
+          }
+        }, 260);
+      }
+    }, { passive: false });
   }
 
   // Initialize Volume from storage

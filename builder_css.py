@@ -2199,7 +2199,7 @@ a {
 /* ========================================================================== */
 @media (max-width: 768px) {
   :root {
-    --header-height: 48px;
+    --header-height: 44px;
     --sidebar-width: 100%;
   }
 
@@ -2208,21 +2208,28 @@ a {
     height: 100%;
     height: 100dvh;
     overflow-x: hidden;
+    touch-action: manipulation;
   }
 
   .app-container {
+    height: 100%;
     height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 
   /* Header on Mobile: Zero horizontal overflow */
   .app-header {
-    padding: 0 6px;
+    padding: 0 8px;
     gap: 4px;
-    overflow-x: hidden;
+    overflow: hidden;
     height: var(--header-height);
+    min-height: var(--header-height);
+    flex-shrink: 0;
   }
   .header-left {
-    gap: 4px;
+    gap: 6px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -2232,14 +2239,14 @@ a {
     gap: 4px;
   }
   .brand-monogram {
-    width: 28px;
-    height: 28px;
-    font-size: 0.85rem;
+    width: 26px;
+    height: 26px;
+    font-size: 0.8rem;
   }
   .header-room-pill {
     padding: 2px 6px;
     font-size: 0.68rem;
-    max-width: 75px;
+    max-width: 80px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2250,20 +2257,20 @@ a {
     display: none !important;
   }
   .header-btn {
-    padding: 5px 6px !important;
+    padding: 5px 7px !important;
     font-size: 0.75rem;
-    min-width: 28px;
+    min-width: 30px;
     height: 30px;
     justify-content: center;
     border-radius: 6px;
   }
   .header-right {
-    gap: 3px;
+    gap: 4px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
   }
-  /* Hide non-essential ping indicator and copy link button on phone screens to give room to controls */
+  /* Hide non-essential ping indicator and copy link button on phone screens */
   .header-ping-pill, #btn-copy-room-link {
     display: none !important;
   }
@@ -2293,7 +2300,7 @@ a {
     width: 100%;
     min-width: 0;
     padding: 2px 4px 2px 8px;
-    height: 30px;
+    height: 28px;
     gap: 4px;
   }
   .universal-search-input {
@@ -2301,95 +2308,311 @@ a {
     min-width: 0;
   }
   .search-submit-btn {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     flex-shrink: 0;
   }
 
   /* Workspace on Mobile */
   .app-workspace {
     height: calc(100dvh - var(--header-height));
-  }
-  .view-pane.room-view {
-    flex-direction: column;
-    overflow-y: auto;
-  }
-
-  /* Player Area on Mobile: Full Width 16:9 */
-  .room-player-column {
+    min-height: 0;
     flex: 1 1 auto;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ======================================================================== */
+  /* ROOM THEATER & CHAT LAYOUT ON MOBILE (PORTRAIT)                          */
+  /* ======================================================================== */
+  .view-pane.room-layout.active {
+    display: flex !important;
+    flex-direction: column !important;
     width: 100% !important;
-    min-width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    position: relative !important;
+    background: #000 !important;
   }
+
+  /* 1. TOP VIDEO PLAYER STAGE: 16:9 FIXED AT TOP */
   .player-stage-wrap {
-    width: 100%;
-    max-width: 100%;
-    aspect-ratio: 16 / 9;
-    border-radius: 0;
-  }
-
-  /* Touch-friendly player controls */
-  .player-ctrl-btn {
-    min-width: 36px;
-    min-height: 36px;
-    padding: 6px;
-  }
-  .player-timeline-container {
-    height: 22px;
-  }
-  .player-timeline-track {
-    height: 5px;
-  }
-  .player-timeline-thumb {
-    width: 14px;
-    height: 14px;
-  }
-
-  /* Chat Sidebar on Mobile: Floating Slide-in Drawer */
-  .room-sidebar {
-    position: fixed;
-    top: var(--header-height);
-    right: 0;
-    bottom: 0;
     width: 100% !important;
     max-width: 100% !important;
-    z-index: 1000;
-    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.7);
-    background: var(--bg-surface);
-  }
-  .room-sidebar.collapsed {
-    display: none !important;
+    flex: 0 0 auto !important;
+    aspect-ratio: 16 / 9 !important;
+    height: auto !important;
+    max-height: 38dvh !important;
+    position: relative !important;
+    background: #000 !important;
+    z-index: 25 !important;
+    border-radius: 0 !important;
+    overflow: hidden !important;
   }
 
-  /* Lobby on Mobile */
-  .lobby-hero {
-    padding: 24px 12px;
+  .player-inner-container {
+    width: 100% !important;
+    height: 100% !important;
+    position: relative !important;
+    background: #000 !important;
   }
-  .lobby-hero-title {
-    font-size: clamp(1.4rem, 6vw, 2.2rem) !important;
-    line-height: 1.25;
+
+  /* 2. BOTTOM CHAT & MEMBERS SIDEBAR: DIRECTLY BELOW VIDEO */
+  .room-sidebar {
+    position: relative !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    border-left: none !important;
+    border-top: 1px solid var(--border-color) !important;
+    background: var(--bg-surface) !important;
+    z-index: 10 !important;
+    overflow: hidden !important;
+    box-shadow: none !important;
   }
-  .lobby-hero-subtitle {
-    font-size: 0.88rem;
-    padding: 0 8px;
+
+  /* When Chat is Collapsed on Mobile: Video Expands to Full Height */
+  .room-layout.chat-collapsed .room-sidebar {
+    display: none !important;
   }
-  .lobby-action-buttons {
-    flex-direction: column;
-    width: 100%;
-    gap: 8px;
-    padding: 0 12px;
+  .room-layout.chat-collapsed .player-stage-wrap {
+    max-height: none !important;
+    height: 100% !important;
+    aspect-ratio: auto !important;
+    flex: 1 1 auto !important;
   }
-  .btn-hero-create, .btn-hero-join {
-    width: 100%;
-    justify-content: center;
-    padding: 12px 20px;
+  .room-layout.chat-collapsed .floating-chat-pill {
+    display: inline-flex !important;
+  }
+
+  /* Floating Chat Pill when Chat is Collapsed */
+  .floating-chat-pill {
+    position: absolute;
+    bottom: 56px;
+    right: 12px;
+    background: rgba(99, 102, 241, 0.9);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    padding: 6px 14px;
+    color: #fff;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    z-index: 50;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  }
+
+  /* Sidebar Header & Tabs */
+  .sidebar-header {
+    padding: 8px 10px 4px 10px !important;
+    gap: 6px !important;
+    background: var(--bg-surface) !important;
+  }
+  .sidebar-participants-row {
+    padding-bottom: 2px !important;
+  }
+  .sidebar-tabs {
+    gap: 4px !important;
+  }
+  .sidebar-tab-btn {
+    padding: 5px 10px !important;
+    font-size: 0.8rem !important;
+    border-radius: 6px !important;
+  }
+
+  /* Chat Messages Stream on Mobile */
+  .chat-messages-container {
+    padding: 8px 10px !important;
+    gap: 8px !important;
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  .chat-msg-row {
+    gap: 8px !important;
+  }
+  .chat-msg-bubble {
+    padding: 6px 10px !important;
+    font-size: 0.82rem !important;
+    border-radius: 12px !important;
+    max-width: 88% !important;
+  }
+
+  /* Quick Reactions Row on Mobile */
+  .chat-reactions-row {
+    padding: 4px 8px !important;
+    gap: 4px !important;
+    justify-content: space-around !important;
+    background: rgba(0, 0, 0, 0.2) !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+    flex-shrink: 0 !important;
+  }
+  .reaction-btn {
+    padding: 3px 6px !important;
+    font-size: 1.1rem !important;
+    min-width: 32px !important;
+    height: 30px !important;
+    border-radius: 8px !important;
+  }
+
+  /* Chat Input Bar on Mobile */
+  .chat-input-bar {
+    padding: 6px 8px !important;
+    gap: 6px !important;
+    background: var(--bg-surface) !important;
+    border-top: 1px solid var(--border-color) !important;
+    flex-shrink: 0 !important;
+  }
+  .chat-input-bar input {
+    font-size: 16px !important; /* CRITICAL: Prevents iOS Safari auto-zoom! */
+    height: 36px !important;
+    padding: 6px 12px !important;
+    border-radius: 18px !important;
+  }
+  .chat-send-btn {
+    width: 36px !important;
+    height: 36px !important;
+    flex-shrink: 0 !important;
+  }
+
+  /* Members Pane on Mobile */
+  .settings-pane-container {
+    padding: 10px 12px !important;
+    gap: 12px !important;
+  }
+
+  /* ======================================================================== */
+  /* TOUCH-FRIENDLY VIDEO PLAYER CONTROLS                                     */
+  /* ======================================================================== */
+  .player-bottom-bar {
+    padding: 2px 8px 8px 8px !important;
+    background: linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.5) 75%, transparent 100%) !important;
+  }
+  .player-title-row {
+    margin-bottom: 2px !important;
+  }
+  .player-title-text {
+    font-size: 0.72rem !important;
+    max-width: 85% !important;
+  }
+
+  /* Timeline Scrubber for Fingers */
+  .player-timeline-container {
+    height: 24px !important;
+    padding: 10px 0 !important;
+    touch-action: none !important;
+    cursor: pointer !important;
+  }
+  .timeline-track {
+    height: 4px !important;
+  }
+  .timeline-thumb {
+    width: 14px !important;
+    height: 14px !important;
+  }
+  .player-timeline-container:active .timeline-thumb {
+    transform: translate(-50%, -50%) scale(1.3) !important;
+  }
+
+  /* Controls Row: Keep Essential Buttons Clean Without Horizontal Overflow */
+  .player-controls-row {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+  }
+
+  .controls-left {
+    gap: 4px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+  /* Hide buttons on mobile that crowd the screen or duplicate phone hardware */
+  .player-volume-group,
+  .controls-left button[onclick*="seekRelative"] {
+    display: none !important;
+  }
+  #btn-ctrl-play {
+    width: 36px !important;
+    height: 36px !important;
+  }
+  #player-time-display {
+    font-size: 0.7rem !important;
+    letter-spacing: -0.3px;
+    margin-left: 2px;
+  }
+
+  .controls-right {
+    gap: 4px !important;
+    display: flex !important;
+    align-items: center !important;
+  }
+  #btn-ctrl-pip {
+    display: none !important;
+  }
+  .player-ctrl-btn {
+    width: 32px !important;
+    height: 32px !important;
+  }
+  .player-quality-btn,
+  .player-episodes-wrap .player-ctrl-btn {
+    padding: 2px 6px !important;
+    font-size: 10px !important;
+    height: 28px !important;
+  }
+  #btn-ctrl-speed {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 10px !important;
+  }
+  #btn-ctrl-fullscreen {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  /* Dropdown Menus on Mobile: Centered or Touch-Friendly */
+  .audio-dropdown-menu,
+  .quality-dropdown-menu,
+  .speed-dropdown-menu {
+    bottom: 42px !important;
+    right: 4px !important;
+    max-width: 260px !important;
+    max-height: 210px !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    border-radius: 10px !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8) !important;
+  }
+  .audio-opt,
+  .quality-opt,
+  .speed-opt {
+    padding: 8px 12px !important;
+    font-size: 0.82rem !important;
+  }
+
+  /* Gestures: Seek Ripple Badges on Mobile */
+  .seek-ripple-badge {
+    padding: 6px 14px !important;
+    font-size: 0.85rem !important;
   }
 
   /* Modals on Mobile: Touch-friendly */
   .modal-dialog {
     width: 95% !important;
     max-width: 95% !important;
-    max-height: 85dvh !important;
+    max-height: 88dvh !important;
     margin: auto !important;
     border-radius: 14px !important;
   }
@@ -2397,20 +2620,107 @@ a {
     font-size: 16px !important; /* Prevents auto-zoom on iOS Safari */
   }
 
-  /* Room Empty State on Mobile */
+  /* Media Details Modal on Mobile */
+  .media-header-card {
+    gap: 12px !important;
+  }
+  .media-poster-img {
+    width: 75px !important;
+    height: 110px !important;
+  }
+  .media-title-main {
+    font-size: 1rem !important;
+  }
+  .episodes-grid-row {
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)) !important;
+    max-height: 150px !important;
+  }
+  .ep-btn {
+    padding: 6px 2px !important;
+    font-size: 0.75rem !important;
+  }
+  .season-tab {
+    padding: 5px 10px !important;
+    font-size: 0.75rem !important;
+  }
+  .media-dub-pill {
+    padding: 5px 8px !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Empty Player Placeholder on Mobile */
   .empty-player-placeholder {
-    padding: 24px 12px;
+    padding: 10px !important;
+  }
+  .empty-icon-cloud {
+    margin-bottom: 6px !important;
+  }
+  .empty-icon-cloud svg {
+    width: 32px !important;
+    height: 32px !important;
   }
   .empty-title {
-    font-size: 1.15rem;
+    font-size: 0.95rem !important;
+    margin-bottom: 4px !important;
+  }
+  .empty-sub {
+    display: none !important;
   }
   .empty-actions-row {
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 8px;
+    gap: 6px !important;
+  }
+  .empty-actions-row .header-btn {
+    padding: 6px 10px !important;
+    font-size: 0.75rem !important;
   }
 }
 
+/* ========================================================================== */
+/* LANDSCAPE PHONE / CINEMA MODE OPTIMIZATION                                 */
+/* ========================================================================== */
+@media (max-width: 950px) and (orientation: landscape), (max-height: 480px) and (orientation: landscape) {
+  :root {
+    --header-height: 0px;
+  }
+  .app-header {
+    display: none !important;
+  }
+  .app-workspace {
+    height: 100dvh !important;
+  }
+  .view-pane.room-layout.active {
+    display: flex !important;
+    flex-direction: row !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+  }
+  .player-stage-wrap {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: 100dvh !important;
+    aspect-ratio: auto !important;
+  }
+  .room-sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 290px !important;
+    max-width: 290px !important;
+    background: rgba(15, 15, 19, 0.88) !important;
+    backdrop-filter: blur(16px) !important;
+    z-index: 120 !important;
+    box-shadow: -6px 0 24px rgba(0,0,0,0.7) !important;
+  }
+  .room-sidebar.collapsed,
+  .room-layout.chat-collapsed .room-sidebar {
+    display: none !important;
+  }
+  .floating-chat-pill {
+    bottom: 24px !important;
+    right: 24px !important;
+  }
+}
 
 /* ========================================================================== */
 /* QUALITY SELECTOR MENU                                                      */

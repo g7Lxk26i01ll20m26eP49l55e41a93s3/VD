@@ -241,6 +241,12 @@ def GET_HTML():
             <!-- FLOATING EMOJI REACTION PARTICLES LAYER -->
             <div class="reaction-layer" id="reaction-layer"></div>
 
+            <!-- FLOATING CHAT PILL (Shown when chat is collapsed on mobile or in theater mode) -->
+            <button class="floating-chat-pill" id="btn-floating-chat-pill" onclick="toggleChatSidebar()" title="Открыть чат">
+              <span style="font-size: 13px;">💬</span>
+              <span id="btn-floating-chat-text" style="font-size: 11px; font-weight: 600;">Чат</span>
+            </button>
+
             <!-- ============================================================ -->
             <!-- CUSTOM VD CONTROLS OVERLAY (ONLY FOR NATIVE & DISK VIDEOS)   -->
             <!-- ============================================================ -->
