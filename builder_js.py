@@ -9,12 +9,18 @@ def GET_JS():
 // ==========================================================================
 // 1. GLOBAL STATE & CONNECTION
 // ==========================================================================
-const socket = io({
+const socket = (typeof io !== "undefined") ? io({
   transports: ["websocket", "polling"],
   reconnection: true,
   reconnectionAttempts: Infinity,
   reconnectionDelay: 1000
-});
+}) : {
+  on: function() {},
+  emit: function() {},
+  once: function() {},
+  connected: false,
+  _callbacks: {}
+};
 window.socket = socket;
 
 let currentRoom = "";
@@ -403,6 +409,10 @@ function initCustomPlayerControls() {
 
   // Native Video element events
   if (videoEl) {
+    videoEl.addEventListener("click", function(e) {
+      e.stopPropagation();
+      togglePlayPauseFromUI();
+    });
     videoEl.addEventListener("timeupdate", onVideoTimeUpdate);
     videoEl.addEventListener("progress", onVideoBufferProgress);
     videoEl.addEventListener("loadedmetadata", onVideoLoadedMetadata);
@@ -694,26 +704,30 @@ function togglePlayPauseFromUI() {
 
   const el = document.getElementById("rave-video-el");
   if (!el) return;
-  isApplyingRemoteEvent = true;
-  const isCurrentlyPlaying = (!el.paused && currentVideo && currentVideo.playing);
+  const isCurrentlyPlaying = !el.paused;
   if (isCurrentlyPlaying) {
     currentVideo.playing = false;
     currentVideo.time = el.currentTime;
     currentVideo.updated_at = serverNow();
     window.currentVideo = currentVideo;
     el.pause();
-    updatePlayPauseIcons(false);
-    if (currentRoom) socket.emit("video_pause", { room_id: currentRoom, time: el.currentTime, source_sid: socket.id });
+    updatePlayPauseUI(false);
+    flashPlayPauseIcon(false);
+    if (currentRoom) {
+      socket.emit("video_pause", { room_id: currentRoom, time: el.currentTime, source_sid: socket.id });
+    }
   } else {
     currentVideo.playing = true;
     currentVideo.time = el.currentTime;
     currentVideo.updated_at = serverNow();
     window.currentVideo = currentVideo;
     safePlayMedia(el);
-    updatePlayPauseIcons(true);
-    if (currentRoom) socket.emit("video_play", { room_id: currentRoom, time: el.currentTime, source_sid: socket.id });
+    updatePlayPauseUI(true);
+    flashPlayPauseIcon(true);
+    if (currentRoom) {
+      socket.emit("video_play", { room_id: currentRoom, time: el.currentTime, source_sid: socket.id });
+    }
   }
-  setTimeout(() => { isApplyingRemoteEvent = false; }, 500);
 }
 
 function seekRelative(deltaSeconds) {
@@ -791,6 +805,10 @@ function updatePlayPauseUI(isPlaying) {
   const pauseIcon = btn.querySelector(".icon-pause");
   if (playIcon) playIcon.style.display = isPlaying ? "none" : "block";
   if (pauseIcon) pauseIcon.style.display = isPlaying ? "block" : "none";
+}
+
+function updatePlayPauseIcons(isPlaying) {
+  updatePlayPauseUI(isPlaying);
 }
 
 function flashPlayPauseIcon(isPlaying) {
@@ -1531,7 +1549,8 @@ function mountHTML5Video(videoEl, video) {
   // and sync state reliably across clients without loops.
   videoEl.onplay = function() {
     requestWakeLock();
-    updatePlayPauseIcons(true);
+    updatePlayPauseUI(true);
+    flashPlayPauseIcon(true);
     if (!isApplyingRemoteEvent && !videoEl.seeking && currentVideo && !currentVideo.playing) {
       currentVideo.playing = true;
       currentVideo.time = videoEl.currentTime;
@@ -1549,7 +1568,8 @@ function mountHTML5Video(videoEl, video) {
 
   videoEl.onpause = function() {
     releaseWakeLock();
-    updatePlayPauseIcons(false);
+    updatePlayPauseUI(false);
+    flashPlayPauseIcon(false);
     if (!isApplyingRemoteEvent && !videoEl.seeking && currentVideo && currentVideo.playing) {
       currentVideo.playing = false;
       currentVideo.time = videoEl.currentTime;
@@ -3011,6 +3031,8 @@ socket.on("video_play", function(data) {
       if (el.paused) safePlayMedia(el);
     }
   }
+  updatePlayPauseUI(true);
+  flashPlayPauseIcon(true);
   setTimeout(() => { isApplyingRemoteEvent = false; }, 400);
 });
 
@@ -3050,6 +3072,8 @@ socket.on("video_pause", function(data) {
       if (!el.paused) el.pause();
     }
   }
+  updatePlayPauseUI(false);
+  flashPlayPauseIcon(false);
   setTimeout(() => { isApplyingRemoteEvent = false; }, 400);
 });
 
