@@ -2411,4 +2411,288 @@ a {
   }
 }
 
+
+/* ========================================================================== */
+/* QUALITY SELECTOR MENU                                                      */
+/* ========================================================================== */
+.player-quality-menu-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.player-quality-btn {
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  padding: 3px 8px !important;
+  border-radius: 6px !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-main) !important;
+  cursor: pointer;
+}
+.player-quality-btn:hover {
+  background: rgba(255, 255, 255, 0.16) !important;
+  border-color: var(--primary) !important;
+}
+.quality-dropdown-menu {
+  position: absolute;
+  bottom: 44px;
+  right: 0;
+  background: rgba(20, 20, 23, 0.95);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 6px;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  z-index: 50;
+  min-width: 140px;
+}
+.quality-dropdown-menu.active {
+  display: flex !important;
+}
+.quality-opt {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  color: var(--text-main);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.quality-opt:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.quality-opt.active {
+  background: rgba(99, 102, 241, 0.2);
+  color: #818cf8;
+  font-weight: 600;
+}
+
+/* Series Episodes Drawer Button in Player */
+.player-episodes-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.player-episodes-wrap .player-ctrl-btn {
+  padding: 3px 8px !important;
+  border-radius: 6px !important;
+  background: rgba(99, 102, 241, 0.15) !important;
+  border: 1px solid rgba(99, 102, 241, 0.4) !important;
+  color: #c7d2fe !important;
+  cursor: pointer;
+}
+.player-episodes-wrap .player-ctrl-btn:hover {
+  background: rgba(99, 102, 241, 0.3) !important;
+  border-color: var(--primary) !important;
+}
+
+/* ========================================================================== */
+/* MEDIA DETAILS MODAL (MOVIES & SERIES PICKER)                               */
+/* ========================================================================== */
+.media-header-card {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+.media-poster-img {
+  width: 95px;
+  height: 140px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: #000;
+  border: 1px solid var(--border-color);
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+.media-meta-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+.media-title-main {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1.3;
+}
+.media-badges-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.media-badge-tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.08);
+  color: var(--text-main);
+}
+.media-desc-text {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.media-section-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 14px 0 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.seasons-tabs-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
+}
+.season-tab {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 6px 14px;
+  border-radius: 18px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.season-tab:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: var(--primary);
+}
+.season-tab.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.4);
+}
+
+.episodes-grid-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: 8px;
+  max-height: 180px;
+  overflow-y: auto;
+  padding: 4px 2px;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.15);
+}
+.ep-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 8px 4px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.ep-btn:hover {
+  border-color: var(--primary);
+  background: rgba(255, 255, 255, 0.1);
+}
+.ep-btn.active {
+  background: rgba(99, 102, 241, 0.25);
+  border-color: var(--primary);
+  color: #818cf8;
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+}
+
+.media-dub-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 2px;
+}
+.media-dub-pill {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+.media-dub-pill:hover {
+  border-color: var(--primary);
+  background: rgba(255, 255, 255, 0.1);
+}
+.media-dub-pill.active {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: #10b981;
+  color: #34d399;
+  font-weight: 600;
+}
+
+.vd-modal-launch-btn {
+  width: 100%;
+  margin-top: 18px;
+  padding: 13px 18px;
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.vd-modal-launch-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 22px rgba(99, 102, 241, 0.6);
+}
+.vd-modal-launch-sub {
+  font-size: 0.75rem;
+  font-weight: 400;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+
+.vd-spinner {
+  width: 34px;
+  height: 34px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: vdSpin 0.75s linear infinite;
+}
+@keyframes vdSpin {
+  to { transform: rotate(360deg); }
+}
+
 """

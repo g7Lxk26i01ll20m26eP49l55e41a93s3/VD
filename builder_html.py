@@ -352,6 +352,21 @@ def GET_HTML():
                       <div class="audio-dropdown-menu" id="audio-dropdown-menu" style="display: none;"></div>
                     </div>
 
+                    <!-- Video Quality Selector (1080p / 720p / 480p / 360p / Auto) -->
+                    <div class="player-quality-menu-wrap" id="player-quality-menu-wrap" style="display: none; position: relative;">
+                      <button class="player-ctrl-btn player-quality-btn" id="btn-ctrl-quality" onclick="toggleQualityMenu()" title="Качество видео (HLS)">
+                        <span id="quality-btn-label">Auto</span>
+                      </button>
+                      <div class="quality-dropdown-menu" id="quality-dropdown-menu" style="display: none;"></div>
+                    </div>
+
+                    <!-- Series Episodes Drawer Button (for TV Series) -->
+                    <div class="player-episodes-wrap" id="player-episodes-wrap" style="display: none; position: relative;">
+                      <button class="player-ctrl-btn" id="btn-ctrl-episodes" onclick="openEpisodesDrawer()" title="Выбор сезона и серии">
+                        <span style="font-size: 12px; font-weight: 600;">📺 Серии</span>
+                      </button>
+                    </div>
+
                     <!-- Playback Speed -->
                     <div class="player-speed-menu-wrap">
                       <button class="player-ctrl-btn player-speed-btn" id="btn-ctrl-speed" onclick="toggleSpeedMenu()" title="Скорость воспроизведения">
@@ -669,6 +684,19 @@ def GET_HTML():
           <div id="room-queue-list" class="queue-list-container">
             <!-- Populated dynamically via JS -->
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8. MEDIA DETAILS & EPISODE/DUBBING PICKER MODAL -->
+    <div class="modal-overlay" id="modal-media-details">
+      <div class="modal-dialog modal-dialog-lg" style="max-width: 680px; width: 92%;">
+        <div class="modal-dialog-header">
+          <div class="modal-dialog-title" id="media-modal-title">Выбор фильма или сериала</div>
+          <button class="modal-dialog-close" onclick="closeModal('modal-media-details')">✕</button>
+        </div>
+        <div class="modal-dialog-body" id="media-modal-body" style="padding: 16px; max-height: 80vh; overflow-y: auto;">
+          <!-- Dynamically populated: poster, title, year, season selector, episode grid, dubbing picker, launch button -->
         </div>
       </div>
     </div>

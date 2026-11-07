@@ -569,12 +569,13 @@ def api_catalog_stream():
     imdb_id = request.args.get("imdb", "").strip()
     season = request.args.get("season")
     episode = request.args.get("episode")
+    title = request.args.get("title", "").strip()
     if season is not None:
         try:
             season = int(season)
         except ValueError:
             pass
-    return jsonify(VideoResolver.resolve_stream_for_play(kp_id=kp_id, imdb_id=imdb_id, season=season, episode=episode))
+    return jsonify(VideoResolver.resolve_stream_for_play(kp_id=kp_id, imdb_id=imdb_id, season=season, episode=episode, title=title))
 
 # ================================= AUTH & USER ACCOUNTS API =================================
 
@@ -2023,7 +2024,7 @@ def handle_change_audio(data):
         "source_name": current_user_name()
     }, to=room_channel(room["id"]))
 
-def set_room_video(room: Dict[str, Any], raw_url: str, title: str = "", poster: str = "", video_type: Optional[str] = None, duration: float = 0.0, source_sid: str = "", source_name: str = ""):
+def set_room_video(room: Dict[str, Any], raw_url: str, title: str = "", poster: str = "", video_type: Optional[str] = None, duration: float = 0.0, source_sid: str = "", source_name: str = "", audio_tracks: Optional[list] = None, subtitles: Optional[list] = None, kp_id: str = "", imdb_id: str = "", season: Any = None, episode: Any = None, selected_audio: int = 0):
     media_data = VideoResolver.resolve(raw_url)
     video = room["video"]
     chosen_title = clean_text(title, 120) or media_data.get("title") or "Без названия"
@@ -2047,8 +2048,13 @@ def set_room_video(room: Dict[str, Any], raw_url: str, title: str = "", poster: 
         "seq": video.get("seq", 0) + 1,
         "source_sid": sid,
         "source_name": uname,
-        "audio_names": media_data.get("audio_names", []),
-        "selected_audio": 0,
+        "audio_tracks": audio_tracks or media_data.get("audio_tracks") or [],
+        "subtitles": subtitles or media_data.get("subtitles") or [],
+        "selected_audio": int(selected_audio or 0),
+        "kp_id": kp_id or media_data.get("kp_id", ""),
+        "imdb_id": imdb_id or media_data.get("imdb_id", ""),
+        "season": season,
+        "episode": episode,
     })
 
     remember_video(room, video)
@@ -2107,7 +2113,14 @@ def handle_change_video(data):
                    title=data.get("title", ""),
                    poster=data.get("poster", ""),
                    video_type=data.get("type"),
-                   duration=float(data.get("duration") or 0.0))
+                   duration=float(data.get("duration") or 0.0),
+                   audio_tracks=data.get("audio_tracks"),
+                   subtitles=data.get("subtitles"),
+                   kp_id=str(data.get("kp_id") or ""),
+                   imdb_id=str(data.get("imdb_id") or ""),
+                   season=data.get("season"),
+                   episode=data.get("episode"),
+                   selected_audio=int(data.get("selected_audio") or 0))
 
 # ================================= VIDEO QUEUE EVENTS =================================
 

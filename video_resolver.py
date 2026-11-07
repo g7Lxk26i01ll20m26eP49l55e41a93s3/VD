@@ -1202,7 +1202,7 @@ class VideoResolver:
         return res
 
     @classmethod
-    def resolve_stream_for_play(cls, kp_id: Optional[str] = None, imdb_id: Optional[str] = None, season: Optional[int] = None, episode: Optional[str] = None) -> Dict[str, Any]:
+    def resolve_stream_for_play(cls, kp_id: Optional[str] = None, imdb_id: Optional[str] = None, season: Optional[int] = None, episode: Optional[str] = None, title: Optional[str] = None) -> Dict[str, Any]:
         # Always obtain a fresh signed embed token to prevent 410 Gone / expired token errors
         details = cls.get_media_details(kp_id=kp_id, imdb_id=imdb_id, force_fresh=True)
         if details.get("error"):
@@ -1222,6 +1222,7 @@ class VideoResolver:
                 }
             return {"type": "none", "url": "", "error": details["error"]}
 
+        main_title = title or details.get("title") or "Фильм"
         if details.get("type") == "movie":
             raw_hls = details.get("hls", "")
             if not raw_hls:
@@ -1229,7 +1230,7 @@ class VideoResolver:
                 return {
                     "type": "embed",
                     "url": embed_url,
-                    "title": details.get("title", "Фильм"),
+                    "title": main_title,
                     "source": "embed_fallback"
                 }
             proxied_hls = f"/api/hls/proxy?url={urllib.parse.quote(raw_hls, safe='')}"
@@ -1237,11 +1238,13 @@ class VideoResolver:
                 "type": "hls",
                 "url": proxied_hls,
                 "raw_url": raw_hls,
-                "title": details.get("title", "Фильм"),
+                "title": main_title,
                 "audio_tracks": details.get("audio", []),
                 "subtitles": details.get("subtitles", []),
                 "has_ukr": details.get("has_ukr", False),
                 "has_ru": details.get("has_ru", False),
+                "kp_id": kp_id,
+                "imdb_id": imdb_id,
                 "source": "collaps_hls"
             }
         elif details.get("type") == "series":
@@ -1267,7 +1270,7 @@ class VideoResolver:
                     target_episode = eps[0]
 
             if target_episode:
-                ep_title = f"{details.get('title', 'Сериал')} (Сезон {target_season.get('season')}, Серия {target_episode.get('episode')})"
+                ep_title = f"{main_title} (Сезон {target_season.get('season')}, Серия {target_episode.get('episode')})"
                 raw_hls = target_episode.get("hls", "")
                 if not raw_hls:
                     embed_url = f"https://api.namy.ws/embed/kp/{kp_id}" if kp_id else f"https://api.namy.ws/embed/imdb/{imdb_id}"
@@ -1284,10 +1287,13 @@ class VideoResolver:
                     "raw_url": raw_hls,
                     "title": ep_title,
                     "audio_tracks": target_episode.get("audio", []),
+                    "subtitles": details.get("subtitles", []),
                     "duration": target_episode.get("duration", 0),
-                    "poster": target_episode.get("poster", ""),
+                    "poster": target_episode.get("poster") or details.get("poster", ""),
                     "season": target_season.get("season"),
                     "episode": target_episode.get("episode"),
+                    "kp_id": kp_id,
+                    "imdb_id": imdb_id,
                     "source": "collaps_hls"
                 }
 

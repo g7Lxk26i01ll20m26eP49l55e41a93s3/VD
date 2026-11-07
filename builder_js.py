@@ -751,14 +751,130 @@ function flashPlayPauseIcon(isPlaying) {
   }, 400);
 }
 
+function closeAllDropdowns() {
+  const sMenu = document.getElementById("speed-dropdown-menu");
+  const aMenu = document.getElementById("audio-dropdown-menu");
+  const qMenu = document.getElementById("quality-dropdown-menu");
+  if (sMenu) { sMenu.classList.remove("active"); sMenu.style.display = "none"; }
+  if (aMenu) { aMenu.classList.remove("active"); aMenu.style.display = "none"; }
+  if (qMenu) { qMenu.classList.remove("active"); qMenu.style.display = "none"; }
+}
+
 function toggleSpeedMenu() {
   const menu = document.getElementById("speed-dropdown-menu");
-  if (menu) menu.classList.toggle("active");
+  if (!menu) return;
+  const isAct = menu.classList.contains("active");
+  closeAllDropdowns();
+  if (!isAct) {
+    menu.classList.add("active");
+    menu.style.display = "flex";
+  }
 }
 
 function toggleAudioMenu() {
   const menu = document.getElementById("audio-dropdown-menu");
-  if (menu) menu.classList.toggle("active");
+  if (!menu) return;
+  const isAct = menu.classList.contains("active");
+  closeAllDropdowns();
+  if (!isAct) {
+    menu.classList.add("active");
+    menu.style.display = "flex";
+  }
+}
+
+function toggleQualityMenu() {
+  const menu = document.getElementById("quality-dropdown-menu");
+  if (!menu) return;
+  const isAct = menu.classList.contains("active");
+  closeAllDropdowns();
+  if (!isAct) {
+    menu.classList.add("active");
+    menu.style.display = "flex";
+  }
+}
+
+function updateQualityLevelsUI() {
+  const wrap = document.getElementById("player-quality-menu-wrap");
+  const menu = document.getElementById("quality-dropdown-menu");
+  if (!wrap || !menu) return;
+
+  const player = hlsPlayer || window.hlsPlayer;
+  if (!player || !player.levels || player.levels.length <= 1) {
+    wrap.style.display = "none";
+    menu.classList.remove("active");
+    menu.style.display = "none";
+    return;
+  }
+
+  wrap.style.display = "inline-flex";
+  menu.innerHTML = "";
+
+  // 1. Auto Option
+  const autoOpt = document.createElement("div");
+  const isAuto = player.currentLevel === -1;
+  autoOpt.className = "quality-opt" + (isAuto ? " active" : "");
+  autoOpt.innerHTML = `<span>Auto (Адаптивное)</span>${isAuto ? '<span style="color:var(--primary); font-weight:700;">✓</span>' : ''}`;
+  autoOpt.onclick = (e) => { e.stopPropagation(); selectQualityLevel(-1); };
+  menu.appendChild(autoOpt);
+
+  // 2. Sorted Levels (Highest to Lowest)
+  const levelsWithIdx = player.levels.map((lvl, idx) => ({ ...lvl, idx }));
+  levelsWithIdx.sort((a, b) => (b.height || 0) - (a.height || 0));
+
+  levelsWithIdx.forEach(lvl => {
+    const opt = document.createElement("div");
+    const isCur = player.currentLevel === lvl.idx;
+    opt.className = "quality-opt" + (isCur ? " active" : "");
+    let label = lvl.height ? `${lvl.height}p` : (lvl.bitrate ? `${Math.round(lvl.bitrate / 1000)} kbps` : `Уровень ${lvl.idx + 1}`);
+    if (lvl.height >= 1080) label += " (FHD)";
+    else if (lvl.height >= 720) label += " (HD)";
+
+    opt.innerHTML = `<span>${label}</span>${isCur ? '<span style="color:var(--primary); font-weight:700;">✓</span>' : ''}`;
+    opt.onclick = (e) => { e.stopPropagation(); selectQualityLevel(lvl.idx); };
+    menu.appendChild(opt);
+  });
+
+  updateQualityButtonLabel();
+}
+
+function selectQualityLevel(levelIdx) {
+  const player = hlsPlayer || window.hlsPlayer;
+  if (!player) return;
+  player.currentLevel = levelIdx;
+  try {
+    localStorage.setItem("vd_preferred_quality", String(levelIdx));
+  } catch(e) {}
+
+  updateQualityLevelsUI();
+  closeAllDropdowns();
+
+  let name = "Auto";
+  if (levelIdx >= 0 && player.levels && player.levels[levelIdx]) {
+    const lvl = player.levels[levelIdx];
+    name = lvl.height ? `${lvl.height}p` : `${levelIdx}`;
+  }
+  showToast(`🎬 Качество: ${name}`);
+}
+
+function updateQualityButtonLabel() {
+  const btnLabel = document.getElementById("quality-btn-label");
+  if (!btnLabel) return;
+  const player = hlsPlayer || window.hlsPlayer;
+  if (!player) {
+    btnLabel.textContent = "Auto";
+    return;
+  }
+  if (player.currentLevel === -1) {
+    const activeLevel = player.levels && player.levels[player.currentLevel >= 0 ? player.currentLevel : player.loadLevel];
+    if (activeLevel && activeLevel.height) {
+      btnLabel.textContent = `Auto (${activeLevel.height}p)`;
+    } else {
+      btnLabel.textContent = "Auto";
+    }
+  } else if (player.levels && player.levels[player.currentLevel]) {
+    const lvl = player.levels[player.currentLevel];
+    btnLabel.textContent = lvl.height ? `${lvl.height}p` : "HD";
+  }
 }
 
 function updateAudioTracksUI() {
@@ -771,16 +887,18 @@ function updateAudioTracksUI() {
   if (hlsPlayer && hlsPlayer.audioTracks && hlsPlayer.audioTracks.length > 1) {
     tracks = hlsPlayer.audioTracks.map((t, idx) => {
       let flag = "🎙️";
-      const lang = (t.lang || "").toLowerCase();
-      if (lang === "uk" || lang === "ua") flag = "🇺🇦";
-      else if (lang === "ru") flag = "🇷🇺";
-      else if (lang === "en") flag = "🇬🇧";
-
       let name = t.name || `Дорожка ${idx + 1}`;
-      if (currentVideo && currentVideo.audio_tracks && currentVideo.audio_tracks[idx]) {
-        name = currentVideo.audio_tracks[idx].name || name;
-        flag = currentVideo.audio_tracks[idx].flag || flag;
+      const metaTracks = (currentVideo && currentVideo.audio_tracks) ? currentVideo.audio_tracks : [];
+      if (metaTracks[idx]) {
+        name = metaTracks[idx].name || name;
+        flag = metaTracks[idx].flag || flag;
+      } else {
+        const lang = (t.lang || "").toLowerCase();
+        if (lang === "uk" || lang === "ua") flag = "🇺🇦";
+        else if (lang === "ru") flag = "🇷🇺";
+        else if (lang === "en") flag = "🇬🇧";
       }
+
       return { id: idx, name: name, flag: flag, active: idx === hlsPlayer.audioTrack };
     });
   } else if (currentVideo && currentVideo.audio_tracks && currentVideo.audio_tracks.length > 1) {
@@ -795,6 +913,7 @@ function updateAudioTracksUI() {
   if (!tracks.length || tracks.length <= 1) {
     wrap.style.display = "none";
     menu.classList.remove("active");
+    menu.style.display = "none";
     return;
   }
 
@@ -803,8 +922,12 @@ function updateAudioTracksUI() {
   tracks.forEach(tr => {
     const opt = document.createElement("div");
     opt.className = "audio-opt" + (tr.active ? " active" : "");
-    opt.innerHTML = `<span>${tr.flag}</span> <span>${escapeHTML(tr.name)}</span>`;
-    opt.onclick = () => selectAudioTrack(tr.id, tr.name);
+    opt.innerHTML = `
+      <span class="audio-opt-flag">${tr.flag}</span>
+      <span class="audio-opt-name" style="flex:1;">${escapeHTML(tr.name)}</span>
+      ${tr.active ? '<span class="audio-opt-check" style="color:var(--primary); font-weight:700;">✓</span>' : ''}
+    `;
+    opt.onclick = (e) => { e.stopPropagation(); selectAudioTrack(tr.id, tr.name); };
     menu.appendChild(opt);
   });
 }
@@ -818,13 +941,8 @@ function selectAudioTrack(trackIndex, trackName) {
   if (currentVideo) {
     currentVideo.selected_audio = trackIndex;
   }
-  const menu = document.getElementById("audio-dropdown-menu");
-  if (menu) {
-    menu.classList.remove("active");
-    menu.querySelectorAll(".audio-opt").forEach((opt, idx) => {
-      opt.classList.toggle("active", idx === trackIndex);
-    });
-  }
+  closeAllDropdowns();
+  updateAudioTracksUI();
   showToast(`🎙️ Озвучка: ${trackName || 'Выбрана'}`);
 }
 
@@ -984,6 +1102,12 @@ function stopAndTearDownAllPlayers() {
   if (emptyPlaceholder) emptyPlaceholder.style.display = "flex";
   const customOverlay = document.getElementById("vd-player-overlay");
   if (customOverlay) customOverlay.style.display = "none";
+  const qWrap = document.getElementById("player-quality-menu-wrap");
+  if (qWrap) qWrap.style.display = "none";
+  const aWrap = document.getElementById("player-audio-menu-wrap");
+  if (aWrap) aWrap.style.display = "none";
+  const epWrap = document.getElementById("player-episodes-wrap");
+  if (epWrap) epWrap.style.display = "none";
   hideCatchupButton();
 }
 
@@ -1037,6 +1161,16 @@ function renderPlayer(video) {
   window.currentVideo = video;
   currentType = currentVideo.type || "none";
   window.currentType = currentType;
+
+  // Toggle episodes drawer button if series
+  const epBtnWrap = document.getElementById("player-episodes-wrap");
+  if (epBtnWrap) {
+    if (currentVideo.season && currentVideo.episode) {
+      epBtnWrap.style.display = "inline-flex";
+    } else {
+      epBtnWrap.style.display = "none";
+    }
+  }
 
   const emptyPlaceholder = document.getElementById("empty-player-placeholder");
   if (emptyPlaceholder) emptyPlaceholder.style.display = "none";
@@ -1279,10 +1413,17 @@ function mountHTML5Video(videoEl, video) {
     hlsPlayer.on(Hls.Events.AUDIO_TRACKS_UPDATED, function() {
       updateAudioTracksUI();
     });
+    hlsPlayer.on(Hls.Events.LEVEL_SWITCHED, function() {
+      updateQualityButtonLabel();
+    });
     hlsPlayer.loadSource(video.url);
     hlsPlayer.attachMedia(videoEl);
     hlsPlayer.on(Hls.Events.MANIFEST_PARSED, function() {
       updateAudioTracksUI();
+      updateQualityLevelsUI();
+      if (video.selected_audio && hlsPlayer.audioTracks && hlsPlayer.audioTracks[video.selected_audio]) {
+        try { hlsPlayer.audioTrack = video.selected_audio; } catch(e) {}
+      }
       if (targetTime > 0) {
         try { videoEl.currentTime = targetTime; } catch(e) {}
       }
@@ -1539,6 +1680,275 @@ function updateBufferStatusToServer(buffering) {
 }
 
 // ==========================================================================
+
+// ==========================================================================
+// 8.5. INTERACTIVE MEDIA DETAILS & SEASON / EPISODE / DUBBING PICKER
+// ==========================================================================
+let currentModalMediaData = null;
+let selectedModalSeason = null;
+let selectedModalEpisode = null;
+let selectedModalDubIndex = 0;
+
+function openMediaDetailsModal(item) {
+  closeModal("modal-search-content");
+  openModal("modal-media-details");
+  const body = document.getElementById("media-modal-body");
+  const titleEl = document.getElementById("media-modal-title");
+  if (!body) return;
+
+  const title = item.title || "Фильм / Сериал";
+  if (titleEl) titleEl.textContent = title;
+
+  body.innerHTML = `
+    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 20px; gap:14px;">
+      <div class="vd-spinner"></div>
+      <div style="color:var(--text-muted); font-size:0.9rem;">Загрузка доступных озвучек, сезонов и серий...</div>
+    </div>
+  `;
+
+  const kp = item.kp_id || "";
+  const imdb = item.imdb_id || "";
+  const detailsUrl = `/api/catalog/details?kp=${encodeURIComponent(kp)}&imdb=${encodeURIComponent(imdb)}`;
+
+  fetch(detailsUrl)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        body.innerHTML = `
+          <div style="text-align:center; padding:30px 10px; color:#ef4444;">
+            <div style="font-size:1.5rem; margin-bottom:8px;">⚠️</div>
+            <div>${escapeHTML(data.error)}</div>
+            <button class="vd-modal-launch-btn" style="margin-top:16px; background:#4b5563;" onclick="closeModal('modal-media-details')">Закрыть</button>
+          </div>
+        `;
+        return;
+      }
+
+      currentModalMediaData = {
+        ...data,
+        title: item.title || data.title || "Видео",
+        poster: item.poster || data.poster || "",
+        year: item.year || data.year || "",
+        rating: item.rating || data.rating || "",
+        description: item.description || data.description || "",
+        kp_id: kp,
+        imdb_id: imdb
+      };
+
+      if (currentModalMediaData.type === "series" && currentModalMediaData.seasons && currentModalMediaData.seasons.length) {
+        selectedModalSeason = currentModalMediaData.seasons[0].season;
+        if (currentModalMediaData.seasons[0].episodes && currentModalMediaData.seasons[0].episodes.length) {
+          selectedModalEpisode = currentModalMediaData.seasons[0].episodes[0].episode;
+        }
+      }
+      selectedModalDubIndex = 0;
+
+      renderMediaDetailsModal();
+    })
+    .catch(() => {
+      body.innerHTML = `
+        <div style="text-align:center; padding:30px 10px; color:#ef4444;">
+          <div>Ошибка загрузки информации о видео</div>
+          <button class="vd-modal-launch-btn" style="margin-top:16px; background:#4b5563;" onclick="closeModal('modal-media-details')">Закрыть</button>
+        </div>
+      `;
+    });
+}
+
+function renderMediaDetailsModal() {
+  const body = document.getElementById("media-modal-body");
+  if (!body || !currentModalMediaData) return;
+
+  const d = currentModalMediaData;
+  const isSeries = d.type === "series";
+  const poster = d.poster || "/static/img/poster-fallback.jpg";
+  const ratingBadge = d.rating ? `<span class="media-badge-tag" style="background:rgba(234,179,8,0.2); color:#facc15;">⭐ ${escapeHTML(String(d.rating))}</span>` : "";
+  const yearBadge = d.year ? `<span class="media-badge-tag">${escapeHTML(String(d.year))}</span>` : "";
+  const typeBadge = isSeries
+    ? `<span class="media-badge-tag" style="background:rgba(245,158,11,0.2); color:#f59e0b;">📺 Сериал (${(d.seasons || []).length} сез.)</span>`
+    : `<span class="media-badge-tag" style="background:rgba(56,189,248,0.2); color:#38bdf8;">🎬 Фильм</span>`;
+
+  let seasonsHtml = "";
+  let episodesHtml = "";
+  let audioTracksToRender = [];
+
+  if (isSeries && d.seasons && d.seasons.length) {
+    // 1. Seasons Row
+    seasonsHtml = `
+      <div class="media-section-label">📺 Выберите сезон:</div>
+      <div class="seasons-tabs-row">
+        ${d.seasons.map(s => `
+          <button class="season-tab ${s.season === selectedModalSeason ? 'active' : ''}" onclick="selectModalSeason(${s.season})">
+            Сезон ${s.season}
+          </button>
+        `).join("")}
+      </div>
+    `;
+
+    // 2. Episodes Row
+    const activeSeasonObj = d.seasons.find(s => s.season === selectedModalSeason) || d.seasons[0];
+    const episodes = (activeSeasonObj && activeSeasonObj.episodes) ? activeSeasonObj.episodes : [];
+    episodesHtml = `
+      <div class="media-section-label">🎞️ Серия:</div>
+      <div class="episodes-grid-row">
+        ${episodes.map(ep => `
+          <button class="ep-btn ${ep.episode === selectedModalEpisode ? 'active' : ''}" onclick="selectModalEpisode(${ep.episode})">
+            ${ep.episode} сер.
+          </button>
+        `).join("")}
+      </div>
+    `;
+
+    // Audio list from active episode or default
+    const activeEpObj = episodes.find(e => e.episode === selectedModalEpisode) || episodes[0];
+    if (activeEpObj && activeEpObj.audio && activeEpObj.audio.length) {
+      audioTracksToRender = activeEpObj.audio;
+    }
+  } else {
+    // Single Movie Audio
+    audioTracksToRender = d.audio || [];
+  }
+
+  // 3. Dubbings Row
+  let dubsHtml = "";
+  if (audioTracksToRender.length > 0) {
+    dubsHtml = `
+      <div class="media-section-label">🎙️ Выберите озвучку / перевод:</div>
+      <div class="media-dub-wrap">
+        ${audioTracksToRender.map((tr, idx) => `
+          <button class="media-dub-pill ${idx === selectedModalDubIndex ? 'active' : ''}" onclick="selectModalDub(${idx})">
+            <span>${tr.flag || '🎙️'}</span>
+            <span>${escapeHTML(tr.name || 'Дорожка ' + (idx + 1))}</span>
+          </button>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  // Subtitle info on button
+  let launchSubtitle = isSeries ? `Сезон ${selectedModalSeason || 1}, Серия ${selectedModalEpisode || 1}` : "Полная версия";
+  if (audioTracksToRender[selectedModalDubIndex]) {
+    launchSubtitle += ` • ${audioTracksToRender[selectedModalDubIndex].name}`;
+  }
+
+  body.innerHTML = `
+    <div class="media-header-card">
+      <img src="${escapeHTML(poster)}" class="media-poster-img" onerror="this.src='/static/img/poster-fallback.jpg'">
+      <div class="media-meta-col">
+        <div class="media-title-main">${escapeHTML(d.title)}</div>
+        <div class="media-badges-row">
+          ${typeBadge}
+          ${yearBadge}
+          ${ratingBadge}
+        </div>
+        ${d.description ? `<div class="media-desc-text">${escapeHTML(d.description)}</div>` : ''}
+      </div>
+    </div>
+
+    ${seasonsHtml}
+    ${episodesHtml}
+    ${dubsHtml}
+
+    <button class="vd-modal-launch-btn" onclick="launchMediaFromModal()">
+      <span>▶ Смотреть вместе в кинозале</span>
+      <span class="vd-modal-launch-sub">${escapeHTML(launchSubtitle)}</span>
+    </button>
+  `;
+}
+
+function selectModalSeason(sNum) {
+  selectedModalSeason = sNum;
+  if (currentModalMediaData && currentModalMediaData.seasons) {
+    const sObj = currentModalMediaData.seasons.find(s => s.season === sNum);
+    if (sObj && sObj.episodes && sObj.episodes.length) {
+      selectedModalEpisode = sObj.episodes[0].episode;
+    }
+  }
+  selectedModalDubIndex = 0;
+  renderMediaDetailsModal();
+}
+
+function selectModalEpisode(epNum) {
+  selectedModalEpisode = epNum;
+  selectedModalDubIndex = 0;
+  renderMediaDetailsModal();
+}
+
+function selectModalDub(dubIdx) {
+  selectedModalDubIndex = dubIdx;
+  renderMediaDetailsModal();
+}
+
+function launchMediaFromModal() {
+  if (!currentModalMediaData) return;
+  const d = currentModalMediaData;
+  closeModal("modal-media-details");
+
+  const kp = d.kp_id || "";
+  const imdb = d.imdb_id || "";
+  const isSeries = d.type === "series";
+  const title = d.title || "Фильм";
+  const s = selectedModalSeason || 1;
+  const ep = selectedModalEpisode || 1;
+  const dubIdx = selectedModalDubIndex || 0;
+
+  showToast(`🔍 Подключение: ${title}...`);
+
+  const streamUrl = isSeries
+    ? `/api/catalog/stream?kp=${encodeURIComponent(kp)}&imdb=${encodeURIComponent(imdb)}&season=${s}&episode=${ep}&title=${encodeURIComponent(title)}`
+    : `/api/catalog/stream?kp=${encodeURIComponent(kp)}&imdb=${encodeURIComponent(imdb)}&title=${encodeURIComponent(title)}`;
+
+  fetch(streamUrl)
+    .then(r => r.json())
+    .then(stream => {
+      if (stream && stream.url) {
+        startVideoDirectly({
+          url: stream.url,
+          type: stream.type || "hls",
+          title: stream.title || title,
+          duration: stream.duration || 0,
+          audio_tracks: stream.audio_tracks || d.audio || [],
+          subtitles: stream.subtitles || d.subtitles || [],
+          kp_id: kp,
+          imdb_id: imdb,
+          season: isSeries ? s : null,
+          episode: isSeries ? ep : null,
+          selected_audio: dubIdx
+        });
+      } else {
+        const embedUrl = kp ? `https://api.namy.ws/embed/kp/${kp}` : `https://api.namy.ws/embed/imdb/${imdb}`;
+        startVideoDirectly({
+          url: embedUrl,
+          type: "embed",
+          title: title,
+          duration: 0
+        });
+      }
+    })
+    .catch(() => {
+      const embedUrl = kp ? `https://api.namy.ws/embed/kp/${kp}` : `https://api.namy.ws/embed/imdb/${imdb}`;
+      startVideoDirectly({
+        url: embedUrl,
+        type: "embed",
+        title: title,
+        duration: 0
+      });
+    });
+}
+
+function openEpisodesDrawer() {
+  if (currentVideo && (currentVideo.kp_id || currentVideo.imdb_id)) {
+    openMediaDetailsModal({
+      kp_id: currentVideo.kp_id,
+      imdb_id: currentVideo.imdb_id,
+      title: currentVideo.title
+    });
+  } else {
+    showToast("Для данного видео список серий не найден");
+  }
+}
+
+// ==========================================================================
 // 9. UNIVERSAL SEARCH & MEDIA LAUNCHING
 // ==========================================================================
 function submitUniversalSearch() {
@@ -1603,26 +2013,29 @@ function submitUniversalSearch() {
 }
 
 function startVideoDirectly(payload) {
+  const vidObj = {
+    url: payload.url,
+    id: payload.id || "",
+    type: payload.type || "mp4",
+    title: payload.title || "Видео",
+    duration: payload.duration || 0,
+    playing: true,
+    time: 0,
+    updated_at: serverNow(),
+    audio_tracks: payload.audio_tracks || [],
+    subtitles: payload.subtitles || [],
+    kp_id: payload.kp_id || "",
+    imdb_id: payload.imdb_id || "",
+    season: payload.season || null,
+    episode: payload.episode || null,
+    selected_audio: payload.selected_audio || 0
+  };
   if (currentRoom) {
     showRoomView();
-    renderPlayer({
-      url: payload.url,
-      id: payload.id || "",
-      type: payload.type || "mp4",
-      title: payload.title || "Видео",
-      duration: payload.duration || 0,
-      playing: true,
-      time: 0,
-      updated_at: serverNow()
-    });
+    renderPlayer(vidObj);
     socket.emit("change_video", {
       room_id: currentRoom,
-      url: payload.url,
-      id: payload.id || "",
-      type: payload.type || "mp4",
-      title: payload.title || "Видео",
-      duration: payload.duration || 0,
-      playing: true
+      ...vidObj
     });
     showToast(`🎬 Запущено: ${payload.title || 'Видео'}`);
   } else {
@@ -1635,12 +2048,7 @@ function startVideoDirectly(payload) {
     socket.once("room_created", function(data) {
       socket.emit("change_video", {
         room_id: data.room.id,
-        url: payload.url,
-        id: payload.id || "",
-        type: payload.type || "mp4",
-        title: payload.title || "Видео",
-        duration: payload.duration || 0,
-        playing: true
+        ...vidObj
       });
     });
   }
@@ -1829,8 +2237,8 @@ function executeModalSearch() {
           </div>
         `;
         card.onclick = () => {
-          closeModal("modal-search-content");
           if (res.url) {
+            closeModal("modal-search-content");
             startVideoDirectly({
               url: res.url,
               id: res.id || "",
@@ -1839,9 +2247,10 @@ function executeModalSearch() {
               duration: res.duration || 0
             });
           } else if (res.teleportal) {
+            closeModal("modal-search-content");
             playTeleportalShow(res);
           } else if (res.kp_id || res.imdb_id) {
-            playCatalogMedia(res);
+            openMediaDetailsModal(res);
           } else {
             showToast("Не удалось определить поток видео");
           }
@@ -3399,5 +3808,15 @@ function onVideoEnded() {
     socket.emit("queue_play_next", { room_id: currentRoom });
   }
 }
+
+
+// Global document listener to close player dropdown menus when clicking outside
+document.addEventListener("click", function(e) {
+  if (!e.target.closest(".player-speed-menu-wrap") &&
+      !e.target.closest(".player-audio-menu-wrap") &&
+      !e.target.closest(".player-quality-menu-wrap")) {
+    closeAllDropdowns();
+  }
+});
 
 """
