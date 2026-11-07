@@ -756,6 +756,118 @@ function toggleSpeedMenu() {
   if (menu) menu.classList.toggle("active");
 }
 
+function toggleAudioMenu() {
+  const menu = document.getElementById("audio-dropdown-menu");
+  if (menu) menu.classList.toggle("active");
+}
+
+function updateAudioTracksUI() {
+  const wrap = document.getElementById("player-audio-menu-wrap");
+  const menu = document.getElementById("audio-dropdown-menu");
+  if (!wrap || !menu) return;
+
+  let tracks = [];
+  // 1. Try Hls.js native audio tracks
+  if (hlsPlayer && hlsPlayer.audioTracks && hlsPlayer.audioTracks.length > 1) {
+    tracks = hlsPlayer.audioTracks.map((t, idx) => {
+      let flag = "🎙️";
+      const lang = (t.lang || "").toLowerCase();
+      if (lang === "uk" || lang === "ua") flag = "🇺🇦";
+      else if (lang === "ru") flag = "🇷🇺";
+      else if (lang === "en") flag = "🇬🇧";
+
+      let name = t.name || `Дорожка ${idx + 1}`;
+      if (currentVideo && currentVideo.audio_tracks && currentVideo.audio_tracks[idx]) {
+        name = currentVideo.audio_tracks[idx].name || name;
+        flag = currentVideo.audio_tracks[idx].flag || flag;
+      }
+      return { id: idx, name: name, flag: flag, active: idx === hlsPlayer.audioTrack };
+    });
+  } else if (currentVideo && currentVideo.audio_tracks && currentVideo.audio_tracks.length > 1) {
+    tracks = currentVideo.audio_tracks.map((t, idx) => ({
+      id: idx,
+      name: t.name || `Дорожка ${idx + 1}`,
+      flag: t.flag || "🎙️",
+      active: idx === (currentVideo.selected_audio || 0)
+    }));
+  }
+
+  if (!tracks.length || tracks.length <= 1) {
+    wrap.style.display = "none";
+    menu.classList.remove("active");
+    return;
+  }
+
+  wrap.style.display = "inline-flex";
+  menu.innerHTML = "";
+  tracks.forEach(tr => {
+    const opt = document.createElement("div");
+    opt.className = "audio-opt" + (tr.active ? " active" : "");
+    opt.innerHTML = `<span>${tr.flag}</span> <span>${escapeHTML(tr.name)}</span>`;
+    opt.onclick = () => selectAudioTrack(tr.id, tr.name);
+    menu.appendChild(opt);
+  });
+}
+
+function selectAudioTrack(trackIndex, trackName) {
+  if (hlsPlayer && typeof hlsPlayer.audioTrack !== "undefined") {
+    try {
+      hlsPlayer.audioTrack = trackIndex;
+    } catch(e) {}
+  }
+  if (currentVideo) {
+    currentVideo.selected_audio = trackIndex;
+  }
+  const menu = document.getElementById("audio-dropdown-menu");
+  if (menu) {
+    menu.classList.remove("active");
+    menu.querySelectorAll(".audio-opt").forEach((opt, idx) => {
+      opt.classList.toggle("active", idx === trackIndex);
+    });
+  }
+  showToast(`🎙️ Озвучка: ${trackName || 'Выбрана'}`);
+}
+
+function sendEmojiReaction(emoji) {
+  if (!currentRoom) {
+    showToast("Реакции доступны внутри комнаты просмотра");
+    return;
+  }
+  const user = currentUser ? (currentUser.username || currentUser.name || "Гость") : "Гость";
+  socket.emit("send_reaction", {
+    room_id: currentRoom,
+    emoji: emoji,
+    user: user
+  });
+  spawnFloatingEmoji(emoji);
+}
+
+function spawnFloatingEmoji(emoji) {
+  const layer = document.getElementById("reaction-layer");
+  if (!layer || !emoji) return;
+
+  const el = document.createElement("div");
+  el.className = "floating-emoji";
+  el.textContent = emoji;
+
+  // Natural randomized spread on right portion of video (62% to 92%)
+  const leftPct = 62 + Math.random() * 28;
+  el.style.left = leftPct.toFixed(1) + "%";
+
+  const rotStart = (Math.random() * 22 - 11).toFixed(1);
+  const rotMid = (Math.random() * 22 - 11).toFixed(1);
+  const rotEnd = (Math.random() * 28 - 14).toFixed(1);
+  el.style.setProperty("--rot-deg", rotStart + "deg");
+  el.style.setProperty("--rot-deg-mid", rotMid + "deg");
+  el.style.setProperty("--rot-deg-end", rotEnd + "deg");
+
+  el.addEventListener("animationend", () => {
+    try { el.remove(); } catch(e) {}
+  });
+  setTimeout(() => { try { el.remove(); } catch(e) {} }, 3000);
+  layer.appendChild(el);
+}
+
 function setSpeedFromUI(rate) {
   setPlayerPlaybackRate(rate);
   const label = document.getElementById("speed-btn-label");
@@ -858,6 +970,10 @@ function stopAndTearDownAllPlayers() {
   const embedIframe = document.getElementById("embed-player-iframe");
   if (embedSlot) embedSlot.style.display = "none";
   if (embedIframe) embedIframe.src = "about:blank";
+  const audioWrap = document.getElementById("player-audio-menu-wrap");
+  const audioMenu = document.getElementById("audio-dropdown-menu");
+  if (audioWrap) audioWrap.style.display = "none";
+  if (audioMenu) audioMenu.classList.remove("active");
   releaseWakeLock();
 
   currentVideo = { type: "none", url: "", id: "", title: "", duration: 0, playing: false, time: 0, updated_at: 0 };
@@ -987,6 +1103,7 @@ function renderPlayer(video) {
       mountHTML5Video(videoEl, currentVideo);
     }
   }
+  updateAudioTracksUI();
 }
 function initYouTubeApi() {
   if (window.YT && window.YT.Player) {
@@ -1159,9 +1276,13 @@ function mountHTML5Video(videoEl, video) {
       lowLatencyMode: false,
       backBufferLength: 90
     });
+    hlsPlayer.on(Hls.Events.AUDIO_TRACKS_UPDATED, function() {
+      updateAudioTracksUI();
+    });
     hlsPlayer.loadSource(video.url);
     hlsPlayer.attachMedia(videoEl);
     hlsPlayer.on(Hls.Events.MANIFEST_PARSED, function() {
+      updateAudioTracksUI();
       if (targetTime > 0) {
         try { videoEl.currentTime = targetTime; } catch(e) {}
       }
@@ -2301,6 +2422,12 @@ socket.on("room_created", function(data) {
     if (data.code) currentRoomCode = data.code;
     joinRoomDirectly(data.room.id, data.code || "");
     showToast(data.code ? `🔒 Приватная комната создана!` : `Комната создана!`);
+  }
+});
+
+socket.on("room_reaction", function(data) {
+  if (data && data.emoji) {
+    spawnFloatingEmoji(data.emoji);
   }
 });
 

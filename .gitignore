@@ -1,0 +1,9 @@
+.session_secret
+github_sync.py
+.edge_*
+__pycache__/
+*.pyc
+rave.db
+.env
+*.tmp
+node_modules/

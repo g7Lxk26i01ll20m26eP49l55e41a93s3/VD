@@ -12,7 +12,29 @@ from werkzeug.security import generate_password_hash, check_password_hash
 DB_PATH = Path(__file__).resolve().parent / "rave.db"
 BACKUP_PATH = Path(__file__).resolve().parent / "users_backup.json"
 
-SESSION_SECRET = os.environ.get("VD_SESSION_SECRET", "vd_session_secret_key_salt_2026_xyz_permanent")
+OLD_STATIC_FALLBACK = "vd_session_secret_key_salt_2026_xyz_permanent"
+
+def get_session_secret() -> str:
+    env_secret = os.environ.get("VD_SESSION_SECRET")
+    if env_secret and len(env_secret.strip()) >= 16:
+        return env_secret.strip()
+    secret_file = Path(__file__).resolve().parent / ".session_secret"
+    if secret_file.exists():
+        try:
+            s = secret_file.read_text(encoding="utf-8").strip()
+            if len(s) >= 16:
+                return s
+        except Exception:
+            pass
+    import secrets
+    new_sec = secrets.token_hex(32)
+    try:
+        secret_file.write_text(new_sec, encoding="utf-8")
+    except Exception:
+        pass
+    return new_sec
+
+SESSION_SECRET = get_session_secret()
 
 def generate_signed_token(user_id: int, expires_ts: float) -> str:
     payload = f"{user_id}:{int(expires_ts)}"
@@ -28,7 +50,10 @@ def verify_signed_token(token: str):
         payload = f"{user_id_str}:{exp_str}"
         expected = hmac.new(SESSION_SECRET.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(sig, expected):
-            return None
+            # Fallback for smooth upgrade of tokens generated prior to dynamic secret
+            fallback_expected = hmac.new(OLD_STATIC_FALLBACK.encode("utf-8"), payload.encode("utf-8"), hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(sig, fallback_expected):
+                return None
         if float(exp_str) < time.time():
             return None
         return int(user_id_str)

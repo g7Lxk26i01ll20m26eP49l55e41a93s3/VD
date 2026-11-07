@@ -968,6 +968,129 @@ a {
 .speed-dropdown-menu.active {
   display: flex;
 }
+
+/* ========================================================================== */
+/* AUDIO DUBBING TRACK SELECTOR MENU                                         */
+/* ========================================================================== */
+.player-audio-menu-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.audio-dropdown-menu {
+  position: absolute;
+  bottom: 44px;
+  right: 0;
+  background: rgba(20, 20, 23, 0.95);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 6px;
+  display: none;
+  flex-direction: column;
+  gap: 3px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+  z-index: 60;
+  min-width: 170px;
+  max-width: 260px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.audio-dropdown-menu.active {
+  display: flex;
+}
+.audio-opt {
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.audio-opt:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+.audio-opt.active {
+  background: rgba(139, 92, 246, 0.22);
+  color: #c084fc;
+  font-weight: 600;
+}
+
+/* ========================================================================== */
+/* FLOATING EMOJI REACTION SYSTEM                                             */
+/* ========================================================================== */
+.reaction-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 45;
+}
+.floating-emoji {
+  position: absolute;
+  bottom: 50px;
+  font-size: 2.3rem;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+  animation: floatEmojiUp 2.2s cubic-bezier(0.18, 0.89, 0.32, 1.15) forwards;
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.7));
+}
+@keyframes floatEmojiUp {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) scale(0.5) rotate(0deg);
+  }
+  12% {
+    opacity: 1;
+    transform: translateY(0) scale(1.25) rotate(var(--rot-deg, -8deg));
+  }
+  55% {
+    opacity: 0.95;
+    transform: translateY(-130px) scale(1.35) rotate(var(--rot-deg-mid, 8deg));
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-290px) scale(1.65) rotate(var(--rot-deg-end, 18deg));
+  }
+}
+.chat-reactions-row {
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px 4px 10px;
+  align-items: center;
+  justify-content: space-around;
+  background: transparent;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+.reaction-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 4px 9px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  line-height: 1;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.15s;
+}
+.reaction-btn:hover {
+  transform: scale(1.35);
+  background: rgba(255, 255, 255, 0.16);
+}
+.reaction-btn:active {
+  transform: scale(0.9);
+}
 .speed-opt {
   padding: 6px 10px;
   border-radius: var(--radius-sm);

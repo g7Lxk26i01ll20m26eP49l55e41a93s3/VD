@@ -13,6 +13,8 @@ from flask import Flask, render_template, request, jsonify, Response, stream_wit
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
 import urllib.parse
+import ipaddress
+import socket
 import database
 from PIL import Image, ImageOps
 from video_resolver import VideoResolver, USER_AGENT
@@ -588,6 +590,9 @@ def get_current_user() -> Optional[Dict[str, Any]]:
 
 @app.route("/api/auth/register", methods=["POST"])
 def api_auth_register():
+    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr).split(",")[0].strip()
+    if not check_rate_limit(f"reg_{client_ip}", max_requests=5, window_sec=60):
+        return jsonify({"error": "Слишком много попыток регистрации. Подождите 1 минуту."}), 429
     data = request.get_json(silent=True) or {}
     username = clean_text(data.get("username", ""), 30).strip()
     display_name = clean_text(data.get("display_name", ""), 60).strip()
@@ -611,6 +616,9 @@ def api_auth_register():
 
 @app.route("/api/auth/login", methods=["POST"])
 def api_auth_login():
+    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr).split(",")[0].strip()
+    if not check_rate_limit(f"login_{client_ip}", max_requests=10, window_sec=60):
+        return jsonify({"error": "Слишком много попыток входа. Подождите 1 минуту."}), 429
     data = request.get_json(silent=True) or {}
     username = clean_text(data.get("username", ""), 30).strip()
     password = str(data.get("password") or "")
@@ -1016,11 +1024,73 @@ def rewrite_m3u8(playlist_text: str, base_url: str, proxy_prefix: str = "/api/hl
 
     return "\n".join(new_lines)
 
+# ================= SECURITY HARDENING: SSRF & RATE LIMITING =================
+_SAFE_PROXY_CACHE = {}
+_RATE_LIMITS = {}
+
+def check_rate_limit(key: str, max_requests: int, window_sec: float) -> bool:
+    """Sliding-window rate limiter for sensitive endpoints."""
+    now_ts = time.time()
+    records = _RATE_LIMITS.setdefault(key, [])
+    records = [t for t in records if now_ts - t < window_sec]
+    if len(records) >= max_requests:
+        _RATE_LIMITS[key] = records
+        return False
+    records.append(now_ts)
+    _RATE_LIMITS[key] = records
+    return True
+
+def is_safe_proxy_url(url: str) -> bool:
+    """Blocks loopback, RFC1918 private IPs, link-local and internal hostnames to prevent SSRF."""
+    try:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
+        hostname = (parsed.hostname or "").strip().lower()
+        if not hostname:
+            return False
+
+        now_ts = time.time()
+        cached = _SAFE_PROXY_CACHE.get(hostname)
+        if cached and now_ts < cached[1]:
+            return cached[0]
+
+        if (
+            hostname in ("localhost", "127.0.0.1", "::1", "metadata.google.internal")
+            or hostname.endswith(".local")
+            or hostname.endswith(".internal")
+        ):
+            _SAFE_PROXY_CACHE[hostname] = (False, now_ts + 300)
+            return False
+
+        try:
+            addr_info = socket.getaddrinfo(hostname, None)
+            for item in addr_info:
+                ip_str = item[4][0]
+                ip_obj = ipaddress.ip_address(ip_str)
+                if (
+                    ip_obj.is_private
+                    or ip_obj.is_loopback
+                    or ip_obj.is_link_local
+                    or ip_obj.is_multicast
+                    or ip_obj.is_reserved
+                    or ip_obj.is_unspecified
+                ):
+                    _SAFE_PROXY_CACHE[hostname] = (False, now_ts + 300)
+                    return False
+        except socket.gaierror:
+            _SAFE_PROXY_CACHE[hostname] = (False, now_ts + 300)
+            return False
+
+        _SAFE_PROXY_CACHE[hostname] = (True, now_ts + 3600)
+        return True
+    except Exception:
+        return False
 @app.route("/api/hls/proxy")
 def api_hls_proxy():
     target_url = request.args.get("url", "").strip()
-    if not target_url or not (target_url.startswith("http://") or target_url.startswith("https://")):
-        return "Invalid url", 400
+    if not target_url or not is_safe_proxy_url(target_url):
+        return "Invalid or restricted stream URL", 400
 
     headers = {
         "User-Agent": USER_AGENT,
@@ -1065,8 +1135,8 @@ def api_hls_proxy():
 @app.route("/api/proxy/stream")
 def api_proxy_stream():
     target_url = request.args.get("url", "").strip()
-    if not target_url:
-        return "Missing url", 400
+    if not target_url or not is_safe_proxy_url(target_url):
+        return "Invalid or restricted stream URL", 400
     headers = {"User-Agent": USER_AGENT}
     range_header = request.headers.get("Range")
     if range_header:
@@ -1794,6 +1864,31 @@ def handle_join_room(data):
     }, broadcast=True)
     emit("room_online", {"room_id": room_id, "online": room_online(room_id)}, to=room_channel(room_id))
     emit("rooms_list", visible_rooms(), broadcast=True)
+
+@socketio.on("send_reaction")
+def handle_send_reaction(data):
+    requested_room_id = clean_text(data.get("room_id") or "", 64)
+    if requested_room_id and requested_room_id in state["rooms"]:
+        target_room_id = requested_room_id
+    else:
+        room = current_room()
+        if not room:
+            return
+        target_room_id = room["id"]
+
+    emoji = clean_text(data.get("emoji") or "", 8).strip()
+    if not emoji:
+        return
+
+    user = data.get("user") or {}
+    user_name = clean_text(user.get("name") or user.get("username") or data.get("author") or current_user_name(), 50)
+
+    # Broadcast reaction to all users in room
+    emit("room_reaction", {
+        "room_id": target_room_id,
+        "emoji": emoji,
+        "author": user_name
+    }, to=room_channel(target_room_id))
 
 @socketio.on("send_message")
 @socketio.on("send_chat")
