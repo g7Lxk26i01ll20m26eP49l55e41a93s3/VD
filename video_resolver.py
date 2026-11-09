@@ -1224,19 +1224,11 @@ class VideoResolver:
 
         main_title = title or details.get("title") or "Фильм"
         if details.get("type") == "movie":
+            embed_url = f"https://api.namy.ws/embed/kp/{kp_id}" if kp_id else f"https://api.namy.ws/embed/imdb/{imdb_id}"
             raw_hls = details.get("hls", "")
-            if not raw_hls:
-                embed_url = f"https://api.namy.ws/embed/kp/{kp_id}" if kp_id else f"https://api.namy.ws/embed/imdb/{imdb_id}"
-                return {
-                    "type": "embed",
-                    "url": embed_url,
-                    "title": main_title,
-                    "source": "embed_fallback"
-                }
-            proxied_hls = f"/api/hls/proxy?url={urllib.parse.quote(raw_hls, safe='')}"
             return {
-                "type": "hls",
-                "url": proxied_hls,
+                "type": "embed",
+                "url": embed_url,
                 "raw_url": raw_hls,
                 "title": main_title,
                 "audio_tracks": details.get("audio", []),
@@ -1245,7 +1237,7 @@ class VideoResolver:
                 "has_ru": details.get("has_ru", False),
                 "kp_id": kp_id,
                 "imdb_id": imdb_id,
-                "source": "collaps_hls"
+                "source": "balancer_embed"
             }
         elif details.get("type") == "series":
             seasons = details.get("seasons", [])
@@ -1269,33 +1261,26 @@ class VideoResolver:
                 if not target_episode and eps:
                     target_episode = eps[0]
 
-            if target_episode:
-                ep_title = f"{main_title} (Сезон {target_season.get('season')}, Серия {target_episode.get('episode')})"
-                raw_hls = target_episode.get("hls", "")
-                if not raw_hls:
-                    embed_url = f"https://api.namy.ws/embed/kp/{kp_id}" if kp_id else f"https://api.namy.ws/embed/imdb/{imdb_id}"
-                    return {
-                        "type": "embed",
-                        "url": embed_url,
-                        "title": ep_title,
-                        "source": "embed_fallback"
-                    }
-                proxied_hls = f"/api/hls/proxy?url={urllib.parse.quote(raw_hls, safe='')}"
-                return {
-                    "type": "hls",
-                    "url": proxied_hls,
-                    "raw_url": raw_hls,
-                    "title": ep_title,
-                    "audio_tracks": target_episode.get("audio", []),
-                    "subtitles": details.get("subtitles", []),
-                    "duration": target_episode.get("duration", 0),
-                    "poster": target_episode.get("poster") or details.get("poster", ""),
-                    "season": target_season.get("season"),
-                    "episode": target_episode.get("episode"),
-                    "kp_id": kp_id,
-                    "imdb_id": imdb_id,
-                    "source": "collaps_hls"
-                }
+            s_num = target_season.get("season", 1) if target_season else 1
+            e_num = target_episode.get("episode", 1) if target_episode else 1
+            ep_title = f"{main_title} (Сезон {s_num}, Серия {e_num})" if target_episode else main_title
+            embed_url = f"https://api.namy.ws/embed/kp/{kp_id}?s={s_num}&e={e_num}" if kp_id else f"https://api.namy.ws/embed/imdb/{imdb_id}?s={s_num}&e={e_num}"
+            raw_hls = target_episode.get("hls", "") if target_episode else ""
+            return {
+                "type": "embed",
+                "url": embed_url,
+                "raw_url": raw_hls,
+                "title": ep_title,
+                "audio_tracks": target_episode.get("audio", []) if target_episode else [],
+                "subtitles": details.get("subtitles", []),
+                "duration": target_episode.get("duration", 0) if target_episode else 0,
+                "poster": (target_episode.get("poster") if target_episode else "") or details.get("poster", ""),
+                "season": s_num,
+                "episode": e_num,
+                "kp_id": kp_id,
+                "imdb_id": imdb_id,
+                "source": "balancer_embed"
+            }
 
         return {"type": "none", "url": "", "error": "Could not extract stream"}
 

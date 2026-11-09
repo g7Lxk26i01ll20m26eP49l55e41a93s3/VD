@@ -2032,6 +2032,7 @@ function submitUniversalSearch() {
     const fileId = pdMatch[1];
     const rawUrl = "https://pixeldrain.com/api/file/" + fileId;
     const proxiedUrl = "/api/proxy/stream?url=" + encodeURIComponent(rawUrl);
+    showToast("💡 Совет: для экономии лимита сервера можно скачать видео и открыть через «📁 Диск / Файл» — 0 МБ трафика сервера!", 7000);
     startVideoDirectly({
       url: proxiedUrl,
       type: "mp4",
