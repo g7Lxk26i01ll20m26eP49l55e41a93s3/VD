@@ -486,6 +486,18 @@ def background_save_loop():
         flush_state()
 
 eventlet.spawn(background_save_loop)
+
+def background_keepalive_loop():
+    time.sleep(30.0)
+    while True:
+        try:
+            ext_url = os.environ.get("RENDER_EXTERNAL_URL") or "https://vd-site.onrender.com"
+            requests.get(f"{ext_url}/ping", timeout=10)
+        except Exception:
+            pass
+        time.sleep(600.0)
+
+eventlet.spawn(background_keepalive_loop)
 load_state()
 
 # ---------------- HTTP ROUTES ----------------
