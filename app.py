@@ -22,6 +22,8 @@ from video_resolver import VideoResolver, USER_AGENT
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "rave_halloween_sync_secret_2026"
 app.config["MAX_CONTENT_LENGTH"] = 10 * 1024 * 1024 * 1024  # 10 GB
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.jinja_env.auto_reload = True
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
 STATE_FILE = Path(__file__).with_name("session_state.json")
