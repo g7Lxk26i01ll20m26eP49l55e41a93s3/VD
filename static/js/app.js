@@ -225,6 +225,7 @@ function showLobbyView() {
     "header-center-search",
     "header-catchup-pill",
     "btn-copy-room-link",
+    "btn-disk-modal-header",
     "btn-toggle-chat",
     "btn-toggle-queue",
   ];
@@ -250,6 +251,7 @@ function showRoomView() {
   const roomElementsToShow = [
     "header-room-pill",
     "btn-copy-room-link",
+    "btn-disk-modal-header",
     "btn-toggle-chat",
     "btn-toggle-queue",
   ];
