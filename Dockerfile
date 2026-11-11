@@ -15,6 +15,6 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 
 COPY --chown=user:user . .
 
-EXPOSE 8080 7860 10000
+EXPOSE 8080
 
-CMD ["sh", "-c", "gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:${PORT:-8080} app:app"]
+CMD ["gunicorn", "--worker-class", "eventlet", "-w", "1", "--bind", "0.0.0.0:8080", "app:app"]
